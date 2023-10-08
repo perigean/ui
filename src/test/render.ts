@@ -84,7 +84,7 @@ export async function testSiblingRender() {
 }
 
 export async function testChildrenArgs() {
-  const c = uiComponent(0, (counter: {i: number}, ...children: HTMLElement[]): HTMLElement => {
+  const c = uiComponent(0, function childrenCounter(counter: {i: number}, ...children: HTMLElement[]): HTMLElement {
     counter.i++;
     const e = document.createElement('div');
     for (const child of children) {
@@ -102,7 +102,7 @@ export async function testChildrenArgs() {
   const bComponent = renderCounter(bCount);
   const c1Count = {i: 0};
   const c2Count = {i: 0};
-  container.appendChild(uiRoot(uiComponent(1, (id: string): HTMLElement => {
+  container.appendChild(uiRoot(uiComponent(1, function root(id: string): HTMLElement {
     const e = document.createElement('div');
     e.id = id;
     const a = aComponent(aState);

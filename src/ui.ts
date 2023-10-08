@@ -59,7 +59,12 @@ type DetachableElement = {
     onDetach?: OnDetachCallback;
 };
 
+type ComponentDebugInfo = {
+    name: string;
+};
+
 type RenderedElementFields<StateArgsT extends any[], ConstArgsT extends any[]> = {
+    debugInfo: ComponentDebugInfo;
     depth: number; // -1 if not attached to the DOM
     stateArgs: WrapInState<StateArgsT>;
     stateGens: StateArgsToGens<StateArgsT>;
@@ -74,6 +79,91 @@ export type RenderedElement = HTMLElement & { [renderedElementFields]: RenderedE
 
 type MaybeRenderedElement = HTMLElement & { [renderedElementFields]?: RenderedElementFields<any[], any[]> };
 
+function debugComponentName(e: MaybeRenderedElement): string | undefined{
+    const fields = e[renderedElementFields];
+    if (fields === undefined) {
+        return undefined;
+    }
+    return fields.debugInfo.name;
+    // // TODO: maybe printing args is too much.
+    // let name = fields.name + '(';
+    // for (const arg of fields.stateArgs) {
+    //     name += arg + ',';
+    // }
+    // if (name.endsWith(',')) {
+    //     name = name.substring(0, name.length - 1);
+    // }
+    // name += ')(';
+    // for (const arg of fields.constArgs) {
+    //     if (arg instanceof HTMLElement) {
+    //         name += debugComponentName(arg) + ',';
+    //     } else {
+    //         name += arg + ',';
+    //     }
+    // }
+    // if (name.endsWith(',')) {
+    //     name = name.substring(0, name.length - 1);
+    // }
+    // name += ')';
+    // return name;
+}
+
+function debugHTMLName(e: HTMLElement): string {
+    let name = '<' + e.tagName;
+    if (e.id !== '') {
+        name += '#' + e.id;
+    }
+    if (e.classList.length > 0) {
+        for (let i = 0; i < e.classList.length; i++) {
+            name += '.' + e.classList[i];
+        }
+    }
+    return name + '>';
+}
+
+export function debugElementName(e: MaybeRenderedElement): string {
+    const htmlName = debugHTMLName(e);
+    let componentName = debugComponentName(e);
+    if (componentName === undefined) {
+        return htmlName;
+    }
+    return componentName + htmlName;
+}
+
+export function debugDOMPath(e: MaybeRenderedElement): string {
+    const parentPath = e.parentElement !== null ? debugDOMPath(e.parentElement) : '';
+    return `${parentPath}/${debugElementName(e)}`;
+}
+
+export function debugLogUITree(e: MaybeRenderedElement) {
+    console.groupCollapsed(debugElementName(e));
+    try {
+        const fields = e[renderedElementFields];
+        if (fields !== undefined) {
+            for (let i = 0; i < fields.stateArgs.length; i++) {
+                const arg = fields.stateArgs[i];
+                console.group(`constArg[${i}]`);
+                console.dir(arg[stateValue]);
+                console.groupEnd();
+            }
+            for (let i = 0; i < fields.constArgs.length; i++) {
+                const arg = fields.constArgs[i];
+                console.group(`stateArg[${i}]`);
+                console.dir(arg[stateValue]);
+                console.groupEnd();
+            }
+        }
+        for (let i = 0; i < e.children.length; i++) {
+            const child = e.children.item(i);
+            if (child instanceof HTMLElement) {
+                debugLogUITree(child);
+            }
+        }
+    } finally {
+        console.groupEnd();
+    }
+}
+
 ////////////////
 // Global State
 // TODO: comments
@@ -87,6 +177,13 @@ type RenderContext = {
 };
 const renderStack: RenderContext[] = [];
 let inBindCallback: boolean = false;
+let renderCount: number = 0;    // For logging.
+
+const indent = '                                                                                ';
+function timeName(render: Function) {
+    const name = render.name !== "" ? render.name : '(anonymous)';
+    return `${renderCount}${indent.substring(0, renderStack.length)}${name}`;
+}
 
 function renderContext(): RenderContext {
     if (inBindCallback) {
@@ -236,36 +333,48 @@ function rerenderElement(dirty: RenderedElement): void {
     if (dirty.parentElement === null) {
         throw new Error('dirty element is not attached to anything');
     }
-    const fields = dirty[renderedElementFields];
-    const depth = fields.depth;
-    renderStack.push({
-        bindingMap: new Map(),
-        callees: [],
-        prevChildren: [dirty],
-    });
-    const re = fields.component(...[...fields.stateArgs, ...fields.constArgs]);
     
-    if (renderStack.length as number !== 1) {
-        throw new Error('renderStack is unbalanced');
+    const tn = `${renderCount} RERENDER`;
+    renderCount++;
+    console.log(debugDOMPath(dirty));
+    console.time(tn);
+    try {
+        const fields = dirty[renderedElementFields];
+        const depth = fields.depth;
+        renderStack.push({
+            bindingMap: new Map(),
+            callees: [],
+            prevChildren: [dirty],
+        });
+        const re = fields.component(...[...fields.stateArgs, ...fields.constArgs]);
+        
+        if (renderStack.length as number !== 1) {
+            throw new Error('renderStack is unbalanced');
+        }
+        const checkCtx = renderStack.pop() as RenderContext;
+        if (checkCtx.bindingMap.size !== 0) {
+            throw new Error('bind called outside of a component');
+        }
+        if (checkCtx.callees.length !== 1 || checkCtx.callees[0] !== re) {
+            throw new Error('unexpected callees of rerender');
+        }
+        if (checkCtx.prevChildren.length !== 0) {
+            throw new Error('rerendered component should have detached dirty');
+        }
+    
+        setDepth(re, depth);
+        // Hook up re into the RenderedElement tree.
+        if (depth > 0) {
+            replaceCallee(parentRenderedElement(dirty), re, dirty);
+        }
+        dirty.parentElement.replaceChild(re, dirty);
+        debugLogUITree(re);
+    } finally {
+        console.timeEnd(tn);
     }
-    const checkCtx = renderStack.pop() as RenderContext;
-    if (checkCtx.bindingMap.size !== 0) {
-        throw new Error('bind called outside of a component');
-    }
-    if (checkCtx.callees.length !== 1 || checkCtx.callees[0] !== re) {
-        throw new Error('unexpected callees of rerender');
-    }
-    if (checkCtx.prevChildren.length !== 0) {
-        throw new Error('rerendered component should have detached dirty');
-    }
-
-    setDepth(re, depth);
-    // Hook up re into the RenderedElement tree.
-    if (depth > 0) {
-        replaceCallee(parentRenderedElement(dirty), re, dirty);
-    }
-    dirty.parentElement.replaceChild(re, dirty);
 }
+
+let setStateCount = 0;
 
 function setStateWorker() {
     const pending = pendingWork;
@@ -277,6 +386,10 @@ function setStateWorker() {
     if (renderStack.length !== 0) {
         throw new Error('renderStack is not empty');
     }
+
+    const tn = `${setStateCount} EVALUATE STATE`;
+    setStateCount++;
+    console.time(tn);
 
     const dirtyElements: RenderedElement[] = [];
     const dirtyBindings: Binding<any>[] = [];
@@ -319,6 +432,7 @@ function setStateWorker() {
     } else {
         pending.reject(errors);
     }
+    console.timeEnd(tn);
 }
 
 // TODO: make member of class State
@@ -326,6 +440,7 @@ export function uiSetState<T>(s: State<T>, value: T): Promise<void> {
     if (renderStack.length !== 0) {
         throw new Error('setState is not allowed in render functions'); 
     }
+    console.timeStamp(`SETSTATE ${setStateCount}`);
     s[stateValue] = value;
     s[stateGeneration]++;
     if (pendingWork === null) {
@@ -387,93 +502,108 @@ function validateBindings(e: HTMLElement, bindings: Set<Binding<any>>): void {
     }
 }
 
+//const functionArgs = /^function\s*[^\(]*\((?:(?<=[\(,])\s*(?:\.\.\.\s*)(?<arg>:\w+)\s*)*\)/mg
+//const functionArgs =   /^function\s*[^\(]*\((?:\s*((?:\.\.\.\s*)?\w+)\s*,?)*\)/m
 
 export function uiComponent<N extends number, ArgsT extends any[]>(stateArgsCount: N, render: (...args: ArgsT) => HTMLElement): (...args: [...RenderState<N, ArgsT>, ...RenderConst<N, ArgsT>]) => RenderedElement {
     // Manages the render context
-    // TODO: update the name on this function for better debugging?
+    const debugInfo: ComponentDebugInfo = {
+        name: render.name !== '' ? render.name : 'anonymous',
+    };
+    // TODO: extract the argument names from render.
+    // console.log(render.toString());
+    // console.dir(functionArgs.exec(render.toString()));
+    
     return function component(...args: [...RenderState<N, ArgsT>, ...RenderConst<N, ArgsT>]): RenderedElement {
         const parentCtx = renderContext();
-        const stateArgs: State<any>[] = args.slice(0, stateArgsCount) as State<any>[];
-        const stateVals: any[] = stateArgs.map(x => x[stateValue]);
-        const stateGens: number[] = stateArgs.map(x => x[stateGeneration]);
-        const constArgs: any[] = args.slice(stateArgsCount);
-        
-        // Check parentCtx.prevChildren for matching state and const args. Remove from prevChildren.
-        const prev = findPrevChild(parentCtx, component, stateArgs, constArgs);
-
-        // Previously rendered element has same state and const args, and state has the same generation. So we can re-use it.
-        if (prev !== null && arrayShallowEquals(prev[renderedElementFields].stateGens, stateGens)) {
-            parentCtx.callees.push(prev);
-            return prev;
-        }
-
-        // Set up new ctx with previous children if we found a previous element.
-        const ctx: RenderContext = {
-            bindingMap: new Map(),
-            callees: [],
-            prevChildren: prev === null ? [] : prev[renderedElementFields].callees,
-        };
-        renderStack.push(ctx);
-
-        // render
-        const e: MaybeRenderedElement = render(...[...stateVals, ...constArgs] as any as ArgsT);
-
-        // pop ctx
-        const checkCtx = renderStack.pop();
-        if (checkCtx !== ctx) {
-            throw new Error('wrong RenderContext on renderStack');
-        }
-
-        // Detach anything left inside prev that wasn't used by render above.
-        if (prev !== null) {
-            detach(prev);
-        }
-        
-        // check callees are under reterned element
-        const callees = ctx.callees;
-        validateCallees(e, callees);
-
-        // Check bindings are under the returned element
-        const bindings = new Set<Binding<any>>();
-        for (const bs of ctx.bindingMap.values()) {
-            for (const b of bs) {
-                bindings.add(b);
+        const tn = timeName(render);
+        console.time(tn);
+        try {
+            const stateArgs: State<any>[] = args.slice(0, stateArgsCount) as State<any>[];
+            const stateVals: any[] = stateArgs.map(x => x[stateValue]);
+            const stateGens: number[] = stateArgs.map(x => x[stateGeneration]);
+            const constArgs: any[] = args.slice(stateArgsCount);
+            
+            // Check parentCtx.prevChildren for matching state and const args. Remove from prevChildren.
+            const prev = findPrevChild(parentCtx, component, stateArgs, constArgs);
+    
+            // Previously rendered element has same state and const args, and state has the same generation. So we can re-use it.
+            if (prev !== null && arrayShallowEquals(prev[renderedElementFields].stateGens, stateGens)) {
+                parentCtx.callees.push(prev);
+                return prev;
             }
-        }
-        validateBindings(e, bindings);
-
-        if (e[renderedElementFields] !== undefined) {
-            // TODO: maybe we can do something with .cloneNode, but it will be complicated.
-            throw new Error('component functions must not return an existing component');
-        }
-
-        // build RenderedFields, attach to element
-        const fields: RenderedElementFields<any, any> = {
-            depth: -1,
-            stateArgs,
-            stateGens,
-            constArgs,
-            component: component as any,
-            callees,
-            bindings,
-        };
-        e[renderedElementFields] = fields;
-        const re: RenderedElement = e as RenderedElement;
-
-        // update binding and state deps
-        for (const b of bindings) {
-            for (const s of b.stateArgs) {
-                s[stateBindingDeps].add(b);
+    
+            // Set up new ctx with previous children if we found a previous element.
+            const ctx: RenderContext = {
+                bindingMap: new Map(),
+                callees: [],
+                prevChildren: prev === null ? [] : prev[renderedElementFields].callees,
+            };
+            renderStack.push(ctx);
+    
+            // render
+            const e: MaybeRenderedElement = render(...[...stateVals, ...constArgs] as any as ArgsT);
+    
+            // pop ctx
+            const checkCtx = renderStack.pop();
+            if (checkCtx !== ctx) {
+                throw new Error('wrong RenderContext on renderStack');
             }
+    
+            // Detach anything left inside prev that wasn't used by render above.
+            if (prev !== null) {
+                detach(prev);
+            }
+            
+            // check callees are under reterned element
+            const callees = ctx.callees;
+            validateCallees(e, callees);
+    
+            // Check bindings are under the returned element
+            const bindings = new Set<Binding<any>>();
+            for (const bs of ctx.bindingMap.values()) {
+                for (const b of bs) {
+                    bindings.add(b);
+                }
+            }
+            validateBindings(e, bindings);
+    
+            if (e[renderedElementFields] !== undefined) {
+                // TODO: maybe we can do something with .cloneNode, but it will be complicated.
+                throw new Error('component functions must not return an existing component');
+            }
+    
+            // build RenderedFields, attach to element
+            const fields: RenderedElementFields<any, any> = {
+                debugInfo,
+                depth: -1,
+                stateArgs,
+                stateGens,
+                constArgs,
+                component: component as any,
+                callees,
+                bindings,
+            };
+            e[renderedElementFields] = fields;
+            const re: RenderedElement = e as RenderedElement;
+    
+            // update binding and state deps
+            for (const b of bindings) {
+                for (const s of b.stateArgs) {
+                    s[stateBindingDeps].add(b);
+                }
+            }
+            for (const s of stateArgs) {
+                s[stateRenderDeps].add(re);
+            }
+    
+            // add rendered element to parentCtx.callees
+            parentCtx.callees.push(re);
+    
+            return re;
+        } finally {
+            console.timeEnd(tn);
         }
-        for (const s of stateArgs) {
-            s[stateRenderDeps].add(re);
-        }
-
-        // add rendered element to parentCtx.callees
-        parentCtx.callees.push(re);
-
-        return re;
     };
 }
 
@@ -482,25 +612,32 @@ export function uiRoot<ArgsT extends any[]>(component: (...args: ArgsT) => Rende
         throw new Error('uiRoot called during render');
     }
 
-    renderStack.push({
-        bindingMap: new Map(),
-        callees: [],
-        prevChildren: [],
-    });
-    const re = component(...args);
-    if (renderStack.length as number !== 1) {
-        throw new Error('renderStack is unbalanced');
+    const tn = `${renderCount} ROOT`;
+    renderCount++;
+    console.time(tn);
+    try {
+        renderStack.push({
+            bindingMap: new Map(),
+            callees: [],
+            prevChildren: [],
+        });
+        const re = component(...args);
+        if (renderStack.length as number !== 1) {
+            throw new Error('renderStack is unbalanced');
+        }
+        const ctx = renderStack.pop() as RenderContext;
+        if (ctx.bindingMap.size !== 0) {
+            throw new Error('bind called outside of a component');
+        }
+        if (ctx.callees.length !== 1 || ctx.callees[0] !== re) {
+            throw new Error('unexpected callees of uiRoot');
+        }
+    
+        setDepth(re, 0);
+        return re;
+    } finally {
+        console.timeEnd(tn);
     }
-    const ctx = renderStack.pop() as RenderContext;
-    if (ctx.bindingMap.size !== 0) {
-        throw new Error('bind called outside of a component');
-    }
-    if (ctx.callees.length !== 1 || ctx.callees[0] !== re) {
-        throw new Error('unexpected callees of uiRoot');
-    }
-
-    setDepth(re, 0);
-    return re;
 }
 
 export function uiBind<ArgsT extends any[]>(e: HTMLElement, callback: (e: HTMLElement, ...args: ArgsT) => void, ...state: WrapInState<ArgsT>): void {

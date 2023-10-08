@@ -1,3 +1,4 @@
+import { div } from "../dom.js";
 import { RenderedElement, State, uiComponent } from "../ui.js";
 
 export function assertEq<T>(a: T, b: T) {
@@ -15,11 +16,9 @@ export function assertTrue(b: boolean) {
 }
 
 export function renderCounter(counter: {i: number}): (id: State<string>) => RenderedElement {
-    return uiComponent(1, (id: string): HTMLElement => {
+    return uiComponent(1, function renderCounter(id: string): HTMLElement {
         counter.i++;
-        const e = document.createElement('div');
-        e.id = id;
-        return e;
+        return div({id});
     });
 }
 
