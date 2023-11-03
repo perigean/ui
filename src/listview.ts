@@ -12,21 +12,22 @@ export interface ListViewData<T> {
 
 type VirtualRow<T> = {
     s: State<T>;
-    top: State<string>;
+    i: number;
+    iState: State<string>;
 };
 
-const VirtualRows = uiComponent(1, function Scroller<T>(rows: VirtualRow<T>[], rowHeight: number, scrollHeight: State<string>, renderRow: (s: State<T>, attributes: Attributes) => RenderedElement): HTMLElement {
+const VirtualRows = uiComponent(2, function VirtualRows<T>(rows: VirtualRow<T>[], rowCount: number, rowHeight: number, renderRow: (s: State<T>, attributes: Attributes) => RenderedElement): HTMLElement {
     return div(
-        {style: { height: scrollHeight }},
-        ...rows.map(r => renderRow(r.s, { style: { position: 'absolute', top: r.top, height: `${rowHeight}px`} })),
+        {style: { display: 'grid', gridTemplateRows: `repeat(${rowCount}, ${rowHeight}px)`}},
+        ...rows.map(r => renderRow(r.s, { style: { gridRow: r.iState } })),
     );
 });
 
 export const ListView = uiComponent(0, function ListView<T>(attributes: Attributes, data: ListViewData<T>, renderRow: (s: State<T>, attributes: Attributes) => RenderedElement): HTMLElement {
-    const rowsHeight = new State<string>(`${data.rowHeight * data.count}px`);
-    let rows: {s: State<T>, top: State<string>, i: number}[] = [];
+    const rowCount = new State<number>(data.count);
+    let rows: {s: State<T>, i: number, iState: State<string>}[] = [];
     const rowsState = new State<VirtualRow<T>[]>(rows);
-    const scroller = div({}, VirtualRows(rowsState, data.rowHeight, rowsHeight, renderRow));
+    const scroller = div({}, VirtualRows(rowsState, rowCount, data.rowHeight, renderRow));
 
     const viewport = div(attributes, scroller);
     viewport.style.overflowY = 'scroll';
@@ -47,8 +48,8 @@ export const ListView = uiComponent(0, function ListView<T>(attributes: Attribut
         for (let i = 0; i < newNumRows; i++) {
             neededIndices.add(newTopRow + i);
         }
-        const freshRows: {s: State<T>, top: State<string>, i: number}[] = [];
-        const staleRows: {s: State<T>, top: State<string>, i: number}[] = [];
+        const freshRows: VirtualRow<T>[] = [];
+        const staleRows: VirtualRow<T>[] = [];
         for (const row of rows) {
             if (neededIndices.delete(row.i)) {
                 // Row was at a needed index, so it's fresh.
@@ -63,14 +64,14 @@ export const ListView = uiComponent(0, function ListView<T>(attributes: Attribut
             const staleRow = staleRows.pop();
             if (staleRow !== undefined) {
                 staleRow.i = i;
-                uiSetState(staleRow.top, `${i * data.rowHeight}px`);
+                uiSetState(staleRow.iState, `${i}`);
                 uiSetState(staleRow.s, data.get(i));
                 freshRows.push(staleRow);
             } else {
                 rowAdded = true;
-                const top = new State<string>(`${i * data.rowHeight}px`);
+                const iState = new State<string>(`${i}`);
                 const s = new State<T>(data.get(i));
-                freshRows.push({s, top, i});
+                freshRows.push({s, i, iState});
             }
         }
         if (freshRows.length === rows.length) {

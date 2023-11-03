@@ -14,16 +14,28 @@ const stateBindingDeps: unique symbol = Symbol('State binding dependencies');
 // TODO: state should be a class, so we can use instaceof to check types.
 
 export class State<T> {
+    private value: T;
     [stateValue]: T;
     [stateRenderDeps]: Set<RenderedElement>;
     [stateBindingDeps]: Set<Binding<any>>;
     [stateGeneration]: number;
 
     constructor(value: T) {
+        this.value = value;
         this[stateValue] = value;
         this[stateRenderDeps] = new Set();
         this[stateBindingDeps] = new Set();
         this[stateGeneration] = 0;
+    }
+
+    get(): T {
+        // TODO: check if we're in a bind or render callback.
+        return this.value;
+    }
+
+    set(value: T) {
+        // TODO: check that we're not in a bind or render callback.
+        this.value = value;
     }
 };
 
@@ -501,9 +513,6 @@ function validateBindings(e: HTMLElement, bindings: Set<Binding<any>>): void {
         }
     }
 }
-
-//const functionArgs = /^function\s*[^\(]*\((?:(?<=[\(,])\s*(?:\.\.\.\s*)(?<arg>:\w+)\s*)*\)/mg
-//const functionArgs =   /^function\s*[^\(]*\((?:\s*((?:\.\.\.\s*)?\w+)\s*,?)*\)/m
 
 export function uiComponent<N extends number, ArgsT extends any[]>(stateArgsCount: N, render: (...args: ArgsT) => HTMLElement): (...args: [...RenderState<N, ArgsT>, ...RenderConst<N, ArgsT>]) => RenderedElement {
     // Manages the render context
