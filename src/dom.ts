@@ -1,6 +1,6 @@
 // TODO: DOM api should just deal with HTMLElements and not have anything to do with components, just bindings.
 
-import { State, uiBind } from "./ui.js";
+import { OpaqueRenderedElement, State, uiBind } from "./ui.js";
 type Equals<X, Y> =
     (<T> () => T extends X ? 1 : 2) extends
         (<T> () => T extends Y ? 1 : 2)
@@ -443,12 +443,13 @@ function applyStyles(e: HTMLElement, style: StyleAttributes) {
         }
     }
     if (bindState !== undefined && bindName !== undefined) {
+        const bindStateNotUndefined = bindState;
         const bindNameNotUndefined = bindName;
-        uiBind(e, (e, ...bindValues) => {
-            for (let i = 0; i < bindValues.length; i++) {
-                e.style[bindNameNotUndefined[i]] = bindValues[i];
+        uiBind(e, e => {
+            for (let i = 0; i < bindStateNotUndefined.length; i++) {
+                e.style[bindNameNotUndefined[i]] = bindStateNotUndefined[i].get();
             }
-        }, ...bindState)
+        });
     }
 }
 
@@ -656,7 +657,7 @@ function isAttributeKey(name: string): name is AttributeKey {
     return attributeKeyNames.has(name);
 }
 
-function createElement<K extends keyof HTMLElementTagNameMap>(tagName: K, attributes: Attributes, children: HTMLElement[]): HTMLElementTagNameMap[K] {
+function createElement<K extends keyof HTMLElementTagNameMap>(tagName: K, attributes: Attributes, children: (HTMLElement | OpaqueRenderedElement)[]): HTMLElementTagNameMap[K] {
     const e = document.createElement(tagName);
 
     if (attributes.style !== undefined) {
@@ -677,26 +678,34 @@ function createElement<K extends keyof HTMLElementTagNameMap>(tagName: K, attrib
         }
     }
     if (bindState !== undefined && bindName !== undefined) {
+        const bindStateNotUndefined = bindState;
         const bindNameNotUndefined = bindName;
-        uiBind(e, (e, ...bindValues) => {
-            for (let i = 0; i < bindValues.length; i++) {
-                (e as any)[bindNameNotUndefined[i]] = bindValues[i];  // TODO: how to typecheck this?
+        uiBind(e, e => {
+            for (let i = 0; i < bindStateNotUndefined.length; i++) {
+                (e[bindNameNotUndefined[i]] as any) = bindStateNotUndefined[i].get();  // TODO: how to typecheck this?
             }
-        }, ...bindState)
+        });
     }
 
     for (const child of children) {
-        e.appendChild(child);
+        e.appendChild(child as HTMLElement);
     }
 
     return e;
 }
 
-export function div(attributes: Attributes, ...children: HTMLElement[]): HTMLDivElement {
+export function div(attributes: Attributes, ...children: (HTMLElement | OpaqueRenderedElement)[]): HTMLDivElement {
     return createElement('div', attributes, children);
 }
 
-export function span(attributes: Attributes, ...children: HTMLElement[]): HTMLSpanElement {
+export function span(attributes: Attributes, ...children: (HTMLElement | OpaqueRenderedElement)[]): HTMLSpanElement {
     return createElement('span', attributes, children);
 }
- 
+
+export function ul(attributes: Attributes, ...children: (HTMLElement | OpaqueRenderedElement)[]): HTMLUListElement {
+    return createElement('ul', attributes, children);
+}
+
+export function li(attributes: Attributes, ...children: (HTMLElement | OpaqueRenderedElement)[]): HTMLLIElement {
+    return createElement('li', attributes, children);
+}

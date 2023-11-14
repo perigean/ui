@@ -1,4 +1,4 @@
-import { RenderedElement, State, uiComponent, uiSetState } from "./ui.js";
+import { OpaqueRenderedElement, State, uiComponent } from "./ui.js";
 
 import { Attributes, div } from "./dom.js"
 
@@ -16,14 +16,14 @@ type VirtualRow<T> = {
     iState: State<string>;
 };
 
-const VirtualRows = uiComponent(2, function VirtualRows<T>(rows: VirtualRow<T>[], rowCount: number, rowHeight: number, renderRow: (s: State<T>, attributes: Attributes) => RenderedElement): HTMLElement {
+const VirtualRows = uiComponent(function VirtualRows<T>(rows: State<VirtualRow<T>[]>, rowCount: State<number>, rowHeight: number, renderRow: (s: State<T>, attributes: Attributes) => OpaqueRenderedElement): HTMLElement {
     return div(
-        {style: { display: 'grid', gridTemplateRows: `repeat(${rowCount}, ${rowHeight}px)`}},
-        ...rows.map(r => renderRow(r.s, { style: { gridRow: r.iState } })),
+        {style: { display: 'grid', gridTemplateRows: `repeat(${rowCount.get()}, ${rowHeight}px)`}},
+        ...rows.get().map(r => renderRow(r.s, { style: { gridRow: r.iState } })),
     );
 });
 
-export const ListView = uiComponent(0, function ListView<T>(attributes: Attributes, data: ListViewData<T>, renderRow: (s: State<T>, attributes: Attributes) => RenderedElement): HTMLElement {
+export const ListView = uiComponent(function ListView<T>(attributes: Attributes, data: ListViewData<T>, renderRow: (s: State<T>, attributes: Attributes) => OpaqueRenderedElement): HTMLElement {
     const rowCount = new State<number>(data.count);
     let rows: {s: State<T>, i: number, iState: State<string>}[] = [];
     const rowsState = new State<VirtualRow<T>[]>(rows);
@@ -64,8 +64,8 @@ export const ListView = uiComponent(0, function ListView<T>(attributes: Attribut
             const staleRow = staleRows.pop();
             if (staleRow !== undefined) {
                 staleRow.i = i;
-                uiSetState(staleRow.iState, `${i}`);
-                uiSetState(staleRow.s, data.get(i));
+                staleRow.iState.set(`${i}`);
+                staleRow.s.set(data.get(i));
                 freshRows.push(staleRow);
             } else {
                 rowAdded = true;
@@ -82,7 +82,7 @@ export const ListView = uiComponent(0, function ListView<T>(attributes: Attribut
             // No need to do anything, since the contents of rows have been mutated.
         } else {
             // We need to re-render VirtualRows, since we added or removed some rendered rows.
-            uiSetState(rowsState, freshRows);
+            rowsState.set(freshRows);
         }
     };
 

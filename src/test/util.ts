@@ -1,5 +1,5 @@
 import { div } from "../dom.js";
-import { RenderedElement, State, uiComponent } from "../ui.js";
+import { OpaqueRenderedElement, State, uiComponent } from "../ui.js";
 
 export function assertEq<T>(a: T, b: T) {
     if (a === b) {
@@ -15,10 +15,10 @@ export function assertTrue(b: boolean) {
     throw new Error(`Expected "${b}" to be true`);
 }
 
-export function renderCounter(counter: {i: number}): (id: State<string>) => RenderedElement {
-    return uiComponent(1, function renderCounter(id: string): HTMLElement {
+export function renderCounter(counter: {i: number}): (id: State<string>) => OpaqueRenderedElement {
+    return uiComponent(function renderCounter(id: State<string>): HTMLElement {
         counter.i++;
-        return div({id});
+        return div({id: id.get()});
     });
 }
 

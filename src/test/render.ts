@@ -1,18 +1,18 @@
-import { RenderedElement, State, uiComponent, uiRoot, uiSetState } from "../ui.js";
+import { div } from "../dom.js";
+import { State, uiRoot, uiComponent, OpaqueRenderedElement } from "../ui.js";
 import { assertEq, domText, renderCounter } from "./util.js";
 
 export async function testBasicRender() {
     const rootCount = {i: 0};
     const rootState = new State('root1');
     const container = document.createElement('div');
-    const root = uiRoot(renderCounter(rootCount), rootState);
-    container.appendChild(root);
+    uiRoot(container, renderCounter(rootCount), rootState);
 
     assertEq(rootCount.i, 1);
     assertEq(domText(container.children.item(0)), `
 <div id="root1">
 </div>`);
-    await uiSetState(rootState, 'root2');
+    await rootState.set('root2');
     assertEq(rootCount.i, 2);
     assertEq(domText(container.children.item(0)), `
 <div id="root2">
@@ -28,14 +28,13 @@ export async function testSiblingRender() {
     const aComponent = renderCounter(aCount);
     const bCount = {i: 0};
     const bComponent = renderCounter(bCount);
-    const root = uiRoot(uiComponent(1, (rootID: string) => {
-        const e = document.createElement('div');
-        e.id = rootID;
-        e.appendChild(aComponent(aState));
-        e.appendChild(bComponent(bState));
-        return e;
+    uiRoot(container, uiComponent((rootID: State<string>) => {
+      return div(
+        {id: rootID.get()},
+        aComponent(aState),
+        bComponent(bState),
+      );
     }), rootState);
-    container.appendChild(root);
 
     assertEq(aCount.i, 1);
     assertEq(bCount.i, 1);
@@ -47,7 +46,7 @@ export async function testSiblingRender() {
   </div>
 </div>`);
 
-    await uiSetState(rootState, 'root2');
+    await rootState.set('root2');
     // BUG: depth is not updated properly here.
     assertEq(aCount.i, 1);  // a, b elements should be untouched.
     assertEq(bCount.i, 1);
@@ -59,7 +58,7 @@ export async function testSiblingRender() {
   </div>
 </div>`);
 
-    await uiSetState(aState, 'a2');
+    await aState.set('a2');
     assertEq(aCount.i, 2);
     assertEq(bCount.i, 1);  // b element should be untouched.
     assertEq(domText(container.children.item(0)), `
@@ -70,8 +69,8 @@ export async function testSiblingRender() {
   </div>
 </div>`);
 
-    uiSetState(rootState, 'root3');
-    await uiSetState(bState, 'b2');
+    rootState.set('root3');
+    await bState.set('b2');
     assertEq(aCount.i, 2);  // a element should be re-used.
     assertEq(bCount.i, 2);
     assertEq(domText(container.children.item(0)), `
@@ -84,13 +83,9 @@ export async function testSiblingRender() {
 }
 
 export async function testChildrenArgs() {
-  const c = uiComponent(0, function childrenCounter(counter: {i: number}, ...children: HTMLElement[]): HTMLElement {
+  const c = uiComponent(function childrenCounter(counter: {i: number}, ...children: (OpaqueRenderedElement | HTMLElement)[]): HTMLElement {
     counter.i++;
-    const e = document.createElement('div');
-    for (const child of children) {
-      e.appendChild(child);
-    }
-    return e;
+    return div({}, ...children);
   });
   const container = document.createElement('div');
   const rootState = new State('root1');
@@ -102,14 +97,14 @@ export async function testChildrenArgs() {
   const bComponent = renderCounter(bCount);
   const c1Count = {i: 0};
   const c2Count = {i: 0};
-  container.appendChild(uiRoot(uiComponent(1, function root(id: string): HTMLElement {
-    const e = document.createElement('div');
-    e.id = id;
+  uiRoot(container, uiComponent(function root(id: State<string>): HTMLElement {
     const a = aComponent(aState);
     const b = bComponent(bState);
-    e.appendChild(c(c1Count, c(c2Count, a), b));
-    return e;
-  }), rootState));
+    return div(
+      {id: id.get()},
+      c(c1Count, c(c2Count, a), b),
+    );
+  }), rootState);
   assertEq(aCount.i, 1);
   assertEq(bCount.i, 1);
   assertEq(domText(container.children.item(0)), `
@@ -124,7 +119,7 @@ export async function testChildrenArgs() {
   </div>
 </div>`);
 
-  await uiSetState(rootState, 'root2');
+  await rootState.set('root2');
   assertEq(aCount.i, 1);
   assertEq(bCount.i, 1);
   assertEq(c1Count.i, 1);
@@ -141,7 +136,7 @@ export async function testChildrenArgs() {
   </div>
 </div>`);
 
-  await uiSetState(aState, 'a2');
+  await aState.set('a2');
   assertEq(aCount.i, 2);
   assertEq(bCount.i, 1);
   assertEq(c1Count.i, 1);
@@ -158,7 +153,7 @@ export async function testChildrenArgs() {
   </div>
 </div>`);
   
-  await uiSetState(bState, 'b2');
+  await bState.set('b2');
   assertEq(aCount.i, 2);
   assertEq(bCount.i, 2);
   assertEq(c1Count.i, 1);

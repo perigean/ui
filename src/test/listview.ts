@@ -1,6 +1,6 @@
 import { Attributes, div } from "../dom.js";
 import { ListView, ListViewData } from "../listview.js";
-import { RenderedElement, State, uiComponent, uiRoot } from "../ui.js";
+import { State, uiRoot, uiComponent } from "../ui.js";
 
 
 function run(container: HTMLElement) {
@@ -13,13 +13,13 @@ function run(container: HTMLElement) {
         renderRange: 2,
     };
 
-    const row = uiComponent(0, (s: State<string>, attributes: Attributes): HTMLElement => {
+    const row = uiComponent((s: State<string>, attributes: Attributes): HTMLElement => {
         return div({innerText: s, ...attributes});
     });
 
-    container.appendChild(uiRoot(ListView, {style: {
+    uiRoot(container, ListView, {style: {
         height: '100%',
-    }}, data, row));
+    }}, data, row);
 }
 
 run(document.getElementById('body') as HTMLElement);

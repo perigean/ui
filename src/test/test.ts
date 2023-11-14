@@ -1,5 +1,6 @@
-import { uiComponent, uiRoot, uiSetState, State } from "../ui.js";
+import { uiComponent, State, uiRoot } from "../ui.js";
 import { testBasicRender, testChildrenArgs, testSiblingRender } from "./render.js";
+import { li, ul } from "../dom.js";
 
 type TestResult = {
     name: string;
@@ -22,18 +23,13 @@ async function runTest(test: () => Promise<void>): Promise<TestResult> {
     return {name, result: null };
 }
 
-const resultsItem = uiComponent(0, function resultsItem(result: TestResult): HTMLElement {
-    const e = document.createElement('li');
-    e.innerText = `${result.name}: ${result.result === null ? 'PASS': 'FAIL'}`;
-    return e;
+const resultsItem = uiComponent(function resultsItem(result: TestResult): HTMLElement {
+    const innerText = `${result.name}: ${result.result === null ? 'PASS': 'FAIL'}`;
+    return li({innerText});
 });
 
-const resultsList = uiComponent(1, function resultsList(results: TestResult[]): HTMLElement {
-    const e = document.createElement('ul');
-    for (const result of results) {
-        e.appendChild(resultsItem(result));
-    }
-    return e;
+const resultsList = uiComponent(function resultsList(results: State<TestResult[]>): HTMLElement {
+    return ul({}, ...results.get().map(r => resultsItem(r)));
 });
 
 async function runTests(container: HTMLElement) {
@@ -42,10 +38,10 @@ async function runTests(container: HTMLElement) {
 
     async function run(test: () => Promise<void>) {
         results = [...results, await runTest(test)];
-        uiSetState(state, results);
+        state.set(results);
     }
 
-    container.appendChild(uiRoot(resultsList, state));
+    uiRoot(container, resultsList, state);
     
     await run(testBasicRender);
     await run(testSiblingRender);
