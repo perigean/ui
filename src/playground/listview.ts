@@ -1,4 +1,4 @@
-import { Attributes, div } from "../dom.js";
+import { HTMLElementAttributes, div } from "../dom.js";
 import { ListView, ListViewData } from "../listview.js";
 import { State, uiRoot, uiComponent } from "../ui.js";
 
@@ -13,7 +13,7 @@ function run(container: HTMLElement) {
         renderRange: 2,
     };
 
-    const row = uiComponent((s: State<string>, attributes: Attributes): HTMLElement => {
+    const row = uiComponent((s: State<string>, attributes: HTMLElementAttributes): HTMLElement => {
         return div({innerText: s, ...attributes});
     });
 

@@ -1,6 +1,8 @@
 import { OpaqueRenderedElement, State, uiComponent } from "./ui.js";
 
-import { Attributes, div } from "./dom.js"
+import { HTMLElementAttributes, div } from "./dom.js"
+
+// TODO: llistview of dygraph to see if it's fast.
 
 export interface ListViewData<T> {
     get: (i: number) => T;
@@ -16,14 +18,14 @@ type VirtualRow<T> = {
     iState: State<string>;
 };
 
-const VirtualRows = uiComponent(function VirtualRows<T>(rows: State<VirtualRow<T>[]>, rowCount: State<number>, rowHeight: number, renderRow: (s: State<T>, attributes: Attributes) => OpaqueRenderedElement): HTMLElement {
+const VirtualRows = uiComponent(function VirtualRows<T>(rows: State<VirtualRow<T>[]>, rowCount: State<number>, rowHeight: number, renderRow: (s: State<T>, attributes: HTMLElementAttributes) => OpaqueRenderedElement): HTMLElement {
     return div(
         {style: { display: 'grid', gridTemplateRows: `repeat(${rowCount.get()}, ${rowHeight}px)`}},
         ...rows.get().map(r => renderRow(r.s, { style: { gridRow: r.iState } })),
     );
 });
 
-export const ListView = uiComponent(function ListView<T>(attributes: Attributes, data: ListViewData<T>, renderRow: (s: State<T>, attributes: Attributes) => OpaqueRenderedElement): HTMLElement {
+export const ListView = uiComponent(function ListView<T>(attributes: HTMLElementAttributes, data: ListViewData<T>, renderRow: (s: State<T>, attributes: HTMLElementAttributes) => OpaqueRenderedElement): HTMLElement {
     const rowCount = new State<number>(data.count);
     let rows: {s: State<T>, i: number, iState: State<string>}[] = [];
     const rowsState = new State<VirtualRow<T>[]>(rows);

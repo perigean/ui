@@ -1,6 +1,9 @@
 // TODO: DOM api should just deal with HTMLElements and not have anything to do with components, just bindings.
 
-import { OpaqueRenderedElement, State, uiBind } from "./ui.js";
+import { MappedState, OpaqueRenderedElement, State, uiBind } from "./ui.js";
+
+type Gettable<T> = State<T> | MappedState<any, T>;
+
 type Equals<X, Y> =
     (<T> () => T extends X ? 1 : 2) extends
         (<T> () => T extends Y ? 1 : 2)
@@ -14,431 +17,20 @@ type WriteableStyleKey = {
 }[keyof CSSStyleDeclaration];
 
 type StyleAttributes = {
-    [K in WriteableStyleKey]?: string | State<string>;
-}
-
-const styleKeyNames: Set<string> = new Set([
-    'accentColor',
-    'alignContent',
-    'alignItems',
-    'alignSelf',
-    'alignmentBaseline',
-    'all',
-    'animation',
-    'animationComposition',
-    'animationDelay',
-    'animationDirection',
-    'animationDuration',
-    'animationFillMode',
-    'animationIterationCount',
-    'animationName',
-    'animationPlayState',
-    'animationTimingFunction',
-    'appearance',
-    'aspectRatio',
-    'backdropFilter',
-    'backfaceVisibility',
-    'background',
-    'backgroundAttachment',
-    'backgroundBlendMode',
-    'backgroundClip',
-    'backgroundColor',
-    'backgroundImage',
-    'backgroundOrigin',
-    'backgroundPosition',
-    'backgroundPositionX',
-    'backgroundPositionY',
-    'backgroundRepeat',
-    'backgroundSize',
-    'baselineShift',
-    'blockSize',
-    'border',
-    'borderBlock',
-    'borderBlockColor',
-    'borderBlockEnd',
-    'borderBlockEndColor',
-    'borderBlockEndStyle',
-    'borderBlockEndWidth',
-    'borderBlockStart',
-    'borderBlockStartColor',
-    'borderBlockStartStyle',
-    'borderBlockStartWidth',
-    'borderBlockStyle',
-    'borderBlockWidth',
-    'borderBottom',
-    'borderBottomColor',
-    'borderBottomLeftRadius',
-    'borderBottomRightRadius',
-    'borderBottomStyle',
-    'borderBottomWidth',
-    'borderCollapse',
-    'borderColor',
-    'borderEndEndRadius',
-    'borderEndStartRadius',
-    'borderImage',
-    'borderImageOutset',
-    'borderImageRepeat',
-    'borderImageSlice',
-    'borderImageSource',
-    'borderImageWidth',
-    'borderInline',
-    'borderInlineColor',
-    'borderInlineEnd',
-    'borderInlineEndColor',
-    'borderInlineEndStyle',
-    'borderInlineEndWidth',
-    'borderInlineStart',
-    'borderInlineStartColor',
-    'borderInlineStartStyle',
-    'borderInlineStartWidth',
-    'borderInlineStyle',
-    'borderInlineWidth',
-    'borderLeft',
-    'borderLeftColor',
-    'borderLeftStyle',
-    'borderLeftWidth',
-    'borderRadius',
-    'borderRight',
-    'borderRightColor',
-    'borderRightStyle',
-    'borderRightWidth',
-    'borderSpacing',
-    'borderStartEndRadius',
-    'borderStartStartRadius',
-    'borderStyle',
-    'borderTop',
-    'borderTopColor',
-    'borderTopLeftRadius',
-    'borderTopRightRadius',
-    'borderTopStyle',
-    'borderTopWidth',
-    'borderWidth',
-    'bottom',
-    'boxShadow',
-    'boxSizing',
-    'breakAfter',
-    'breakBefore',
-    'breakInside',
-    'captionSide',
-    'caretColor',
-    'clear',
-    'clipPath',
-    'clipRule',
-    'color',
-    'colorInterpolation',
-    'colorInterpolationFilters',
-    'colorScheme',
-    'columnCount',
-    'columnFill',
-    'columnGap',
-    'columnRule',
-    'columnRuleColor',
-    'columnRuleStyle',
-    'columnRuleWidth',
-    'columnSpan',
-    'columnWidth',
-    'columns',
-    'contain',
-    'containIntrinsicBlockSize',
-    'containIntrinsicHeight',
-    'containIntrinsicInlineSize',
-    'containIntrinsicSize',
-    'containIntrinsicWidth',
-    'container',
-    'containerName',
-    'containerType',
-    'content',
-    'counterIncrement',
-    'counterReset',
-    'counterSet',
-    'cssFloat',
-    'cssText',
-    'cursor',
-    'direction',
-    'display',
-    'dominantBaseline',
-    'emptyCells',
-    'fill',
-    'fillOpacity',
-    'fillRule',
-    'filter',
-    'flex',
-    'flexBasis',
-    'flexDirection',
-    'flexFlow',
-    'flexGrow',
-    'flexShrink',
-    'flexWrap',
-    'float',
-    'floodColor',
-    'floodOpacity',
-    'font',
-    'fontFamily',
-    'fontFeatureSettings',
-    'fontKerning',
-    'fontOpticalSizing',
-    'fontPalette',
-    'fontSize',
-    'fontSizeAdjust',
-    'fontStretch',
-    'fontStyle',
-    'fontSynthesis',
-    'fontSynthesisSmallCaps',
-    'fontSynthesisStyle',
-    'fontSynthesisWeight',
-    'fontVariant',
-    'fontVariantAlternates',
-    'fontVariantCaps',
-    'fontVariantEastAsian',
-    'fontVariantLigatures',
-    'fontVariantNumeric',
-    'fontVariantPosition',
-    'fontVariationSettings',
-    'fontWeight',
-    'gap',
-    'grid',
-    'gridArea',
-    'gridAutoColumns',
-    'gridAutoFlow',
-    'gridAutoRows',
-    'gridColumn',
-    'gridColumnEnd',
-    'gridColumnStart',
-    'gridRow',
-    'gridRowEnd',
-    'gridRowStart',
-    'gridTemplate',
-    'gridTemplateAreas',
-    'gridTemplateColumns',
-    'gridTemplateRows',
-    'height',
-    'hyphenateCharacter',
-    'hyphens',
-    'imageRendering',
-    'inlineSize',
-    'inset',
-    'insetBlock',
-    'insetBlockEnd',
-    'insetBlockStart',
-    'insetInline',
-    'insetInlineEnd',
-    'insetInlineStart',
-    'isolation',
-    'justifyContent',
-    'justifyItems',
-    'justifySelf',
-    'left',
-    'letterSpacing',
-    'lightingColor',
-    'lineBreak',
-    'lineHeight',
-    'listStyle',
-    'listStyleImage',
-    'listStylePosition',
-    'listStyleType',
-    'margin',
-    'marginBlock',
-    'marginBlockEnd',
-    'marginBlockStart',
-    'marginBottom',
-    'marginInline',
-    'marginInlineEnd',
-    'marginInlineStart',
-    'marginLeft',
-    'marginRight',
-    'marginTop',
-    'marker',
-    'markerEnd',
-    'markerMid',
-    'markerStart',
-    'mask',
-    'maskClip',
-    'maskComposite',
-    'maskImage',
-    'maskMode',
-    'maskOrigin',
-    'maskPosition',
-    'maskRepeat',
-    'maskSize',
-    'maskType',
-    'mathStyle',
-    'maxBlockSize',
-    'maxHeight',
-    'maxInlineSize',
-    'maxWidth',
-    'minBlockSize',
-    'minHeight',
-    'minInlineSize',
-    'minWidth',
-    'mixBlendMode',
-    'objectFit',
-    'objectPosition',
-    'offset',
-    'offsetDistance',
-    'offsetPath',
-    'offsetRotate',
-    'opacity',
-    'order',
-    'orphans',
-    'outline',
-    'outlineColor',
-    'outlineOffset',
-    'outlineStyle',
-    'outlineWidth',
-    'overflow',
-    'overflowAnchor',
-    'overflowClipMargin',
-    'overflowWrap',
-    'overflowX',
-    'overflowY',
-    'overscrollBehavior',
-    'overscrollBehaviorBlock',
-    'overscrollBehaviorInline',
-    'overscrollBehaviorX',
-    'overscrollBehaviorY',
-    'padding',
-    'paddingBlock',
-    'paddingBlockEnd',
-    'paddingBlockStart',
-    'paddingBottom',
-    'paddingInline',
-    'paddingInlineEnd',
-    'paddingInlineStart',
-    'paddingLeft',
-    'paddingRight',
-    'paddingTop',
-    'page',
-    'pageBreakAfter',
-    'pageBreakBefore',
-    'pageBreakInside',
-    'paintOrder',
-    'perspective',
-    'perspectiveOrigin',
-    'placeContent',
-    'placeItems',
-    'placeSelf',
-    'pointerEvents',
-    'position',
-    'printColorAdjust',
-    'quotes',
-    'resize',
-    'right',
-    'rotate',
-    'rowGap',
-    'rubyPosition',
-    'scale',
-    'scrollBehavior',
-    'scrollMargin',
-    'scrollMarginBlock',
-    'scrollMarginBlockEnd',
-    'scrollMarginBlockStart',
-    'scrollMarginBottom',
-    'scrollMarginInline',
-    'scrollMarginInlineEnd',
-    'scrollMarginInlineStart',
-    'scrollMarginLeft',
-    'scrollMarginRight',
-    'scrollMarginTop',
-    'scrollPadding',
-    'scrollPaddingBlock',
-    'scrollPaddingBlockEnd',
-    'scrollPaddingBlockStart',
-    'scrollPaddingBottom',
-    'scrollPaddingInline',
-    'scrollPaddingInlineEnd',
-    'scrollPaddingInlineStart',
-    'scrollPaddingLeft',
-    'scrollPaddingRight',
-    'scrollPaddingTop',
-    'scrollSnapAlign',
-    'scrollSnapStop',
-    'scrollSnapType',
-    'scrollbarGutter',
-    'shapeImageThreshold',
-    'shapeMargin',
-    'shapeOutside',
-    'shapeRendering',
-    'stopColor',
-    'stopOpacity',
-    'stroke',
-    'strokeDasharray',
-    'strokeDashoffset',
-    'strokeLinecap',
-    'strokeLinejoin',
-    'strokeMiterlimit',
-    'strokeOpacity',
-    'strokeWidth',
-    'tabSize',
-    'tableLayout',
-    'textAlign',
-    'textAlignLast',
-    'textAnchor',
-    'textCombineUpright',
-    'textDecoration',
-    'textDecorationColor',
-    'textDecorationLine',
-    'textDecorationSkipInk',
-    'textDecorationStyle',
-    'textDecorationThickness',
-    'textEmphasis',
-    'textEmphasisColor',
-    'textEmphasisPosition',
-    'textEmphasisStyle',
-    'textIndent',
-    'textOrientation',
-    'textOverflow',
-    'textRendering',
-    'textShadow',
-    'textTransform',
-    'textUnderlineOffset',
-    'textUnderlinePosition',
-    'top',
-    'touchAction',
-    'transform',
-    'transformBox',
-    'transformOrigin',
-    'transformStyle',
-    'transition',
-    'transitionDelay',
-    'transitionDuration',
-    'transitionProperty',
-    'transitionTimingFunction',
-    'translate',
-    'unicodeBidi',
-    'userSelect',
-    'verticalAlign',
-    'visibility',
-    'webkitLineClamp',
-    'webkitMaskComposite',
-    'webkitTextFillColor',
-    'webkitTextStroke',
-    'webkitTextStrokeColor',
-    'webkitTextStrokeWidth',
-    'whiteSpace',
-    'widows',
-    'width',
-    'willChange',
-    'wordBreak',
-    'wordSpacing',
-    'writingMode',
-    'zIndex',
-]);
-
-function isStyleKey(name: string): name is WriteableStyleKey {
-    return styleKeyNames.has(name);
+    [K in WriteableStyleKey]?: string | State<string> | MappedState<any, string>;
 }
 
 function applyStyles(e: HTMLElement, style: StyleAttributes) {
-    let bindState: State<string>[] | undefined;
-    let bindName: WriteableStyleKey[] | undefined;
+    let bindState: (State<string> | MappedState<any, string>)[] | undefined;
+    let bindName: string[] | undefined;
     for (const name in style) {
-        if (isStyleKey(name)) {
-            const value = style[name];
-            if (value instanceof State) {
+        if (Object.hasOwn(style, name)) {
+            const value = (style as any)[name];
+            if (value instanceof State || value instanceof MappedState) {
                 (bindState = bindState || []).push(value);
                 (bindName = bindName || []).push(name);
             } else if (value !== undefined) {
-                e.style[name] = value;
+                (e.style as any)[name] = value;
             }
         }
     }
@@ -446,234 +38,209 @@ function applyStyles(e: HTMLElement, style: StyleAttributes) {
         const bindStateNotUndefined = bindState;
         const bindNameNotUndefined = bindName;
         uiBind(e, e => {
+            const estyle: any = e.style;
             for (let i = 0; i < bindStateNotUndefined.length; i++) {
-                e.style[bindNameNotUndefined[i]] = bindStateNotUndefined[i].get();
+                estyle[bindNameNotUndefined[i]] = bindStateNotUndefined[i].get();
             }
         });
     }
 }
 
-type ElementAttributes = {
-    id?: string | State<string>;
-    innerText?: string | State<string>;
+type HTMLElementAttribute<AttributeT>
+    = AttributeT
+    | State<AttributeT>
+    | MappedState<any, AttributeT>;
+
+type HTMLElementEventListenerAttribute<EventT>
+    = ((this: HTMLElement, ev: EventT) => any)
+    | State<(this: HTMLElement, ev: EventT) => any>
+    | MappedState<any, (this: HTMLElement, ev: EventT) => any>;
+
+// The base set of attributes shared by all HTML Elements.
+type HTMLElementAttributesBase = {
+    style?: StyleAttributes;
+
+    accessKey?: HTMLElementAttribute<string>;
+    autocapitalize?: HTMLElementAttribute<string>;
+    dir?: HTMLElementAttribute<string>;
+    draggable?: HTMLElementAttribute<boolean>;
+    hidden?: HTMLElementAttribute<boolean>;
+    inert?: HTMLElementAttribute<boolean>;
+    innerText?: HTMLElementAttribute<string>;
+    lang?: HTMLElementAttribute<string>;
+    popover?: HTMLElementAttribute<string | null>;
+    spellcheck?: HTMLElementAttribute<boolean>;
+    title?: HTMLElementAttribute<string>;
+    translate?: HTMLElementAttribute<boolean>;
+
+    contentEditable?: HTMLElementAttribute<string>;
+    enterKeyHint?: HTMLElementAttribute<string>;
+    inputMode?: HTMLElementAttribute<string>;
+
+    autofocus?: HTMLElementAttribute<boolean>;
+    tabIndex?: HTMLElementAttribute<number>;
+
+    className?: HTMLElementAttribute<string>;
+    id?: HTMLElementAttribute<string>;
+    scrollLeft?: HTMLElementAttribute<number>;
+    scrollTop?: HTMLElementAttribute<number>;
+    slot?: HTMLElementAttribute<string>;
+
+    textContent?: HTMLElementAttribute<string | null>;
+
+    ariaAtomic?: HTMLElementAttribute<string | null>;
+    ariaAutoComplete?: HTMLElementAttribute<string | null>;
+    ariaBusy?: HTMLElementAttribute<string | null>;
+    ariaChecked?: HTMLElementAttribute<string | null>;
+    ariaColCount?: HTMLElementAttribute<string | null>;
+    ariaColIndex?: HTMLElementAttribute<string | null>;
+    ariaColSpan?: HTMLElementAttribute<string | null>;
+    ariaCurrent?: HTMLElementAttribute<string | null>;
+    ariaDisabled?: HTMLElementAttribute<string | null>;
+    ariaExpanded?: HTMLElementAttribute<string | null>;
+    ariaHasPopup?: HTMLElementAttribute<string | null>;
+    ariaHidden?: HTMLElementAttribute<string | null>;
+    ariaInvalid?: HTMLElementAttribute<string | null>;
+    ariaKeyShortcuts?: HTMLElementAttribute<string | null>;
+    ariaLabel?: HTMLElementAttribute<string | null>;
+    ariaLevel?: HTMLElementAttribute<string | null>;
+    ariaLive?: HTMLElementAttribute<string | null>;
+    ariaModal?: HTMLElementAttribute<string | null>;
+    ariaMultiLine?: HTMLElementAttribute<string | null>;
+    ariaMultiSelectable?: HTMLElementAttribute<string | null>;
+    ariaOrientation?: HTMLElementAttribute<string | null>;
+    ariaPlaceholder?: HTMLElementAttribute<string | null>;
+    ariaPosInSet?: HTMLElementAttribute<string | null>;
+    ariaPressed?: HTMLElementAttribute<string | null>;
+    ariaReadOnly?: HTMLElementAttribute<string | null>;
+    ariaRequired?: HTMLElementAttribute<string | null>;
+    ariaRoleDescription?: HTMLElementAttribute<string | null>;
+    ariaRowCount?: HTMLElementAttribute<string | null>;
+    ariaRowIndex?: HTMLElementAttribute<string | null>;
+    ariaRowSpan?: HTMLElementAttribute<string | null>;
+    ariaSelected?: HTMLElementAttribute<string | null>;
+    ariaSetSize?: HTMLElementAttribute<string | null>;
+    ariaSort?: HTMLElementAttribute<string | null>;
+    ariaValueMax?: HTMLElementAttribute<string | null>;
+    ariaValueMin?: HTMLElementAttribute<string | null>;
+    ariaValueNow?: HTMLElementAttribute<string | null>;
+    ariaValueText?: HTMLElementAttribute<string | null>;
+    role?: HTMLElementAttribute<string | null>;
+
     // Event attributes
-    onabort?: ((this: GlobalEventHandlers, ev: UIEvent) => any) | State<(this: GlobalEventHandlers, ev: UIEvent) => any>;
-    onanimationcancel?: ((this: GlobalEventHandlers, ev: AnimationEvent) => any) | State<(this: GlobalEventHandlers, ev: AnimationEvent) => any>;
-    onanimationend?: ((this: GlobalEventHandlers, ev: AnimationEvent) => any) | State<(this: GlobalEventHandlers, ev: AnimationEvent) => any>;
-    onanimationiteration?: ((this: GlobalEventHandlers, ev: AnimationEvent) => any) | State<(this: GlobalEventHandlers, ev: AnimationEvent) => any>;
-    onanimationstart?: ((this: GlobalEventHandlers, ev: AnimationEvent) => any) | State<(this: GlobalEventHandlers, ev: AnimationEvent) => any>;
-    onauxclick?: ((this: GlobalEventHandlers, ev: MouseEvent) => any) | State<(this: GlobalEventHandlers, ev: MouseEvent) => any>;
-    onbeforeinput?: ((this: GlobalEventHandlers, ev: InputEvent) => any) | State<(this: GlobalEventHandlers, ev: InputEvent) => any>;
-    onblur?: ((this: GlobalEventHandlers, ev: FocusEvent) => any) | State<(this: GlobalEventHandlers, ev: FocusEvent) => any>;
-    oncancel?: ((this: GlobalEventHandlers, ev: Event) => any) | State<(this: GlobalEventHandlers, ev: Event) => any>;
-    oncanplay?: ((this: GlobalEventHandlers, ev: Event) => any) | State<(this: GlobalEventHandlers, ev: Event) => any>;
-    oncanplaythrough?: ((this: GlobalEventHandlers, ev: Event) => any) | State<(this: GlobalEventHandlers, ev: Event) => any>;
-    onchange?: ((this: GlobalEventHandlers, ev: Event) => any) | State<(this: GlobalEventHandlers, ev: Event) => any>;
-    onclick?: ((this: GlobalEventHandlers, ev: MouseEvent) => any) | State<(this: GlobalEventHandlers, ev: MouseEvent) => any>;
-    onclose?: ((this: GlobalEventHandlers, ev: Event) => any) | State<(this: GlobalEventHandlers, ev: Event) => any>;
-    oncontextmenu?: ((this: GlobalEventHandlers, ev: MouseEvent) => any) | State<(this: GlobalEventHandlers, ev: MouseEvent) => any>;
-    oncopy?: ((this: GlobalEventHandlers, ev: ClipboardEvent) => any) | State<(this: GlobalEventHandlers, ev: ClipboardEvent) => any>;
-    oncuechange?: ((this: GlobalEventHandlers, ev: Event) => any) | State<(this: GlobalEventHandlers, ev: Event) => any>;
-    oncut?: ((this: GlobalEventHandlers, ev: ClipboardEvent) => any) | State<(this: GlobalEventHandlers, ev: ClipboardEvent) => any>;
-    ondblclick?: ((this: GlobalEventHandlers, ev: MouseEvent) => any) | State<(this: GlobalEventHandlers, ev: MouseEvent) => any>;
-    ondrag?: ((this: GlobalEventHandlers, ev: DragEvent) => any) | State<(this: GlobalEventHandlers, ev: DragEvent) => any>;
-    ondragend?: ((this: GlobalEventHandlers, ev: DragEvent) => any) | State<(this: GlobalEventHandlers, ev: DragEvent) => any>;
-    ondragenter?: ((this: GlobalEventHandlers, ev: DragEvent) => any) | State<(this: GlobalEventHandlers, ev: DragEvent) => any>;
-    ondragleave?: ((this: GlobalEventHandlers, ev: DragEvent) => any) | State<(this: GlobalEventHandlers, ev: DragEvent) => any>;
-    ondragover?: ((this: GlobalEventHandlers, ev: DragEvent) => any) | State<(this: GlobalEventHandlers, ev: DragEvent) => any>;
-    ondragstart?: ((this: GlobalEventHandlers, ev: DragEvent) => any) | State<(this: GlobalEventHandlers, ev: DragEvent) => any>;
-    ondrop?: ((this: GlobalEventHandlers, ev: DragEvent) => any) | State<(this: GlobalEventHandlers, ev: DragEvent) => any>;
-    ondurationchange?: ((this: GlobalEventHandlers, ev: Event) => any) | State<(this: GlobalEventHandlers, ev: Event) => any>;
-    onemptied?: ((this: GlobalEventHandlers, ev: Event) => any) | State<(this: GlobalEventHandlers, ev: Event) => any>;
-    onended?: ((this: GlobalEventHandlers, ev: Event) => any) | State<(this: GlobalEventHandlers, ev: Event) => any>;
-    onerror?: OnErrorEventHandlerNonNull | State<OnErrorEventHandlerNonNull>;
-    onfocus?: ((this: GlobalEventHandlers, ev: FocusEvent) => any) | State<(this: GlobalEventHandlers, ev: FocusEvent) => any>;
-    onformdata?: ((this: GlobalEventHandlers, ev: FormDataEvent) => any) | State<(this: GlobalEventHandlers, ev: FormDataEvent) => any>;
-    ongotpointercapture?: ((this: GlobalEventHandlers, ev: PointerEvent) => any) | State<(this: GlobalEventHandlers, ev: PointerEvent) => any>;
-    oninput?: ((this: GlobalEventHandlers, ev: Event) => any) | State<(this: GlobalEventHandlers, ev: Event) => any>;
-    oninvalid?: ((this: GlobalEventHandlers, ev: Event) => any) | State<(this: GlobalEventHandlers, ev: Event) => any>;
-    onkeydown?: ((this: GlobalEventHandlers, ev: KeyboardEvent) => any) | State<(this: GlobalEventHandlers, ev: KeyboardEvent) => any>;
-    onkeypress?: ((this: GlobalEventHandlers, ev: KeyboardEvent) => any) | State<(this: GlobalEventHandlers, ev: KeyboardEvent) => any>;
-    onkeyup?: ((this: GlobalEventHandlers, ev: KeyboardEvent) => any) | State<(this: GlobalEventHandlers, ev: KeyboardEvent) => any>;
-    onload?: ((this: GlobalEventHandlers, ev: Event) => any) | State<(this: GlobalEventHandlers, ev: Event) => any>;
-    onloadeddata?: ((this: GlobalEventHandlers, ev: Event) => any) | State<(this: GlobalEventHandlers, ev: Event) => any>;
-    onloadedmetadata?: ((this: GlobalEventHandlers, ev: Event) => any) | State<(this: GlobalEventHandlers, ev: Event) => any>;
-    onloadstart?: ((this: GlobalEventHandlers, ev: Event) => any) | State<(this: GlobalEventHandlers, ev: Event) => any>;
-    onlostpointercapture?: ((this: GlobalEventHandlers, ev: PointerEvent) => any) | State<(this: GlobalEventHandlers, ev: PointerEvent) => any>;
-    onmousedown?: ((this: GlobalEventHandlers, ev: MouseEvent) => any) | State<(this: GlobalEventHandlers, ev: MouseEvent) => any>;
-    onmouseenter?: ((this: GlobalEventHandlers, ev: MouseEvent) => any) | State<(this: GlobalEventHandlers, ev: MouseEvent) => any>;
-    onmouseleave?: ((this: GlobalEventHandlers, ev: MouseEvent) => any) | State<(this: GlobalEventHandlers, ev: MouseEvent) => any>;
-    onmousemove?: ((this: GlobalEventHandlers, ev: MouseEvent) => any) | State<(this: GlobalEventHandlers, ev: MouseEvent) => any>;
-    onmouseout?: ((this: GlobalEventHandlers, ev: MouseEvent) => any) | State<(this: GlobalEventHandlers, ev: MouseEvent) => any>;
-    onmouseover?: ((this: GlobalEventHandlers, ev: MouseEvent) => any) | State<(this: GlobalEventHandlers, ev: MouseEvent) => any>;
-    onmouseup?: ((this: GlobalEventHandlers, ev: MouseEvent) => any) | State<(this: GlobalEventHandlers, ev: MouseEvent) => any>;
-    onpaste?: ((this: GlobalEventHandlers, ev: ClipboardEvent) => any) | State<(this: GlobalEventHandlers, ev: ClipboardEvent) => any>;
-    onpause?: ((this: GlobalEventHandlers, ev: Event) => any) | State<(this: GlobalEventHandlers, ev: Event) => any>;
-    onplay?: ((this: GlobalEventHandlers, ev: Event) => any) | State<(this: GlobalEventHandlers, ev: Event) => any>;
-    onplaying?: ((this: GlobalEventHandlers, ev: Event) => any) | State<(this: GlobalEventHandlers, ev: Event) => any>;
-    onpointercancel?: ((this: GlobalEventHandlers, ev: PointerEvent) => any) | State<(this: GlobalEventHandlers, ev: PointerEvent) => any>;
-    onpointerdown?: ((this: GlobalEventHandlers, ev: PointerEvent) => any) | State<(this: GlobalEventHandlers, ev: PointerEvent) => any>;
-    onpointerenter?: ((this: GlobalEventHandlers, ev: PointerEvent) => any) | State<(this: GlobalEventHandlers, ev: PointerEvent) => any>;
-    onpointerleave?: ((this: GlobalEventHandlers, ev: PointerEvent) => any) | State<(this: GlobalEventHandlers, ev: PointerEvent) => any>;
-    onpointermove?: ((this: GlobalEventHandlers, ev: PointerEvent) => any) | State<(this: GlobalEventHandlers, ev: PointerEvent) => any>;
-    onpointerout?: ((this: GlobalEventHandlers, ev: PointerEvent) => any) | State<(this: GlobalEventHandlers, ev: PointerEvent) => any>;
-    onpointerover?: ((this: GlobalEventHandlers, ev: PointerEvent) => any) | State<(this: GlobalEventHandlers, ev: PointerEvent) => any>;
-    onpointerup?: ((this: GlobalEventHandlers, ev: PointerEvent) => any) | State<(this: GlobalEventHandlers, ev: PointerEvent) => any>;
-    onprogress?: ((this: GlobalEventHandlers, ev: ProgressEvent) => any) | State<(this: GlobalEventHandlers, ev: ProgressEvent) => any>;
-    onratechange?: ((this: GlobalEventHandlers, ev: Event) => any) | State<(this: GlobalEventHandlers, ev: Event) => any>;
-    onreset?: ((this: GlobalEventHandlers, ev: Event) => any) | State<(this: GlobalEventHandlers, ev: Event) => any>;
-    onresize?: ((this: GlobalEventHandlers, ev: UIEvent) => any) | State<(this: GlobalEventHandlers, ev: UIEvent) => any>;
-    onscroll?: ((this: GlobalEventHandlers, ev: Event) => any) | State<(this: GlobalEventHandlers, ev: Event) => any>;
-    onsecuritypolicyviolation?: ((this: GlobalEventHandlers, ev: SecurityPolicyViolationEvent) => any) | State<(this: GlobalEventHandlers, ev: SecurityPolicyViolationEvent) => any>;
-    onseeked?: ((this: GlobalEventHandlers, ev: Event) => any) | State<(this: GlobalEventHandlers, ev: Event) => any>;
-    onseeking?: ((this: GlobalEventHandlers, ev: Event) => any) | State<(this: GlobalEventHandlers, ev: Event) => any>;
-    onselect?: ((this: GlobalEventHandlers, ev: Event) => any) | State<(this: GlobalEventHandlers, ev: Event) => any>;
-    onselectionchange?: ((this: GlobalEventHandlers, ev: Event) => any) | State<(this: GlobalEventHandlers, ev: Event) => any>;
-    onselectstart?: ((this: GlobalEventHandlers, ev: Event) => any) | State<(this: GlobalEventHandlers, ev: Event) => any>;
-    onslotchange?: ((this: GlobalEventHandlers, ev: Event) => any) | State<(this: GlobalEventHandlers, ev: Event) => any>;
-    onstalled?: ((this: GlobalEventHandlers, ev: Event) => any) | State<(this: GlobalEventHandlers, ev: Event) => any>;
-    onsubmit?: ((this: GlobalEventHandlers, ev: SubmitEvent) => any) | State<(this: GlobalEventHandlers, ev: SubmitEvent) => any>;
-    onsuspend?: ((this: GlobalEventHandlers, ev: Event) => any) | State<(this: GlobalEventHandlers, ev: Event) => any>;
-    ontimeupdate?: ((this: GlobalEventHandlers, ev: Event) => any) | State<(this: GlobalEventHandlers, ev: Event) => any>;
-    ontoggle?: ((this: GlobalEventHandlers, ev: Event) => any) | State<(this: GlobalEventHandlers, ev: Event) => any>;
-    ontouchcancel?: ((this: GlobalEventHandlers, ev: TouchEvent) => any) | State<(this: GlobalEventHandlers, ev: TouchEvent) => any>;
-    ontouchend?: ((this: GlobalEventHandlers, ev: TouchEvent) => any) | State<(this: GlobalEventHandlers, ev: TouchEvent) => any>;
-    ontouchmove?: ((this: GlobalEventHandlers, ev: TouchEvent) => any) | State<(this: GlobalEventHandlers, ev: TouchEvent) => any>;
-    ontouchstart?: ((this: GlobalEventHandlers, ev: TouchEvent) => any) | State<(this: GlobalEventHandlers, ev: TouchEvent) => any>;
-    ontransitioncancel?: ((this: GlobalEventHandlers, ev: TransitionEvent) => any) | State<(this: GlobalEventHandlers, ev: TransitionEvent) => any>;
-    ontransitionend?: ((this: GlobalEventHandlers, ev: TransitionEvent) => any) | State<(this: GlobalEventHandlers, ev: TransitionEvent) => any>;
-    ontransitionrun?: ((this: GlobalEventHandlers, ev: TransitionEvent) => any) | State<(this: GlobalEventHandlers, ev: TransitionEvent) => any>;
-    ontransitionstart?: ((this: GlobalEventHandlers, ev: TransitionEvent) => any) | State<(this: GlobalEventHandlers, ev: TransitionEvent) => any>;
-    onvolumechange?: ((this: GlobalEventHandlers, ev: Event) => any) | State<(this: GlobalEventHandlers, ev: Event) => any>;
-    onwaiting?: ((this: GlobalEventHandlers, ev: Event) => any) | State<(this: GlobalEventHandlers, ev: Event) => any>;
-    onwebkitanimationend?: ((this: GlobalEventHandlers, ev: Event) => any) | State<(this: GlobalEventHandlers, ev: Event) => any>;
-    onwebkitanimationiteration?: ((this: GlobalEventHandlers, ev: Event) => any) | State<(this: GlobalEventHandlers, ev: Event) => any>;
-    onwebkitanimationstart?: ((this: GlobalEventHandlers, ev: Event) => any) | State<(this: GlobalEventHandlers, ev: Event) => any>;
-    onwebkittransitionend?: ((this: GlobalEventHandlers, ev: Event) => any) | State<(this: GlobalEventHandlers, ev: Event) => any>;
+    onerror?: HTMLElementAttribute<OnErrorEventHandlerNonNull>;
+
+    onabort?: HTMLElementEventListenerAttribute<UIEvent>;
+    onanimationcancel?: HTMLElementEventListenerAttribute<AnimationEvent>;
+    onanimationend?: HTMLElementEventListenerAttribute<AnimationEvent>;
+    onanimationiteration?: HTMLElementEventListenerAttribute<AnimationEvent>;
+    onanimationstart?: HTMLElementEventListenerAttribute<AnimationEvent>;
+    onauxclick?: HTMLElementEventListenerAttribute<MouseEvent>;
+    onbeforeinput?: HTMLElementEventListenerAttribute<InputEvent>;
+    onblur?: HTMLElementEventListenerAttribute<FocusEvent>;
+    oncancel?: HTMLElementEventListenerAttribute<Event>;
+    oncanplay?: HTMLElementEventListenerAttribute<Event>;
+    oncanplaythrough?: HTMLElementEventListenerAttribute<Event>;
+    onchange?: HTMLElementEventListenerAttribute<Event>;
+    onclick?: HTMLElementEventListenerAttribute<MouseEvent>;
+    onclose?: HTMLElementEventListenerAttribute<Event>;
+    oncontextmenu?: HTMLElementEventListenerAttribute<MouseEvent>;
+    oncopy?: HTMLElementEventListenerAttribute<ClipboardEvent>;
+    oncuechange?: HTMLElementEventListenerAttribute<Event>;
+    oncut?: HTMLElementEventListenerAttribute<ClipboardEvent>;
+    ondblclick?: HTMLElementEventListenerAttribute<MouseEvent>;
+    ondrag?: HTMLElementEventListenerAttribute<DragEvent>;
+    ondragend?: HTMLElementEventListenerAttribute<DragEvent>;
+    ondragenter?: HTMLElementEventListenerAttribute<DragEvent>;
+    ondragleave?: HTMLElementEventListenerAttribute<DragEvent>;
+    ondragover?: HTMLElementEventListenerAttribute<DragEvent>;
+    ondragstart?: HTMLElementEventListenerAttribute<DragEvent>;
+    ondrop?: HTMLElementEventListenerAttribute<DragEvent>;
+    ondurationchange?: HTMLElementEventListenerAttribute<Event>;
+    onemptied?: HTMLElementEventListenerAttribute<Event>;
+    onended?: HTMLElementEventListenerAttribute<Event>;
+    onfocus?: HTMLElementEventListenerAttribute<FocusEvent>;
+    onformdata?: HTMLElementEventListenerAttribute<FormDataEvent>;
+    ongotpointercapture?: HTMLElementEventListenerAttribute<PointerEvent>;
+    oninput?: HTMLElementEventListenerAttribute<Event>;
+    oninvalid?: HTMLElementEventListenerAttribute<Event>;
+    onkeydown?: HTMLElementEventListenerAttribute<KeyboardEvent>;
+    onkeypress?: HTMLElementEventListenerAttribute<KeyboardEvent>;
+    onkeyup?: HTMLElementEventListenerAttribute<KeyboardEvent>;
+    onload?: HTMLElementEventListenerAttribute<Event>;
+    onloadeddata?: HTMLElementEventListenerAttribute<Event>;
+    onloadedmetadata?: HTMLElementEventListenerAttribute<Event>;
+    onloadstart?: HTMLElementEventListenerAttribute<Event>;
+    onlostpointercapture?: HTMLElementEventListenerAttribute<PointerEvent>;
+    onmousedown?: HTMLElementEventListenerAttribute<MouseEvent>;
+    onmouseenter?: HTMLElementEventListenerAttribute<MouseEvent>;
+    onmouseleave?: HTMLElementEventListenerAttribute<MouseEvent>;
+    onmousemove?: HTMLElementEventListenerAttribute<MouseEvent>;
+    onmouseout?: HTMLElementEventListenerAttribute<MouseEvent>;
+    onmouseover?: HTMLElementEventListenerAttribute<MouseEvent>;
+    onmouseup?: HTMLElementEventListenerAttribute<MouseEvent>;
+    onpaste?: HTMLElementEventListenerAttribute<ClipboardEvent>;
+    onpause?: HTMLElementEventListenerAttribute<Event>;
+    onplay?: HTMLElementEventListenerAttribute<Event>;
+    onplaying?: HTMLElementEventListenerAttribute<Event>;
+    onpointercancel?: HTMLElementEventListenerAttribute<PointerEvent>;
+    onpointerdown?: HTMLElementEventListenerAttribute<PointerEvent>;
+    onpointerenter?: HTMLElementEventListenerAttribute<PointerEvent>;
+    onpointerleave?: HTMLElementEventListenerAttribute<PointerEvent>;
+    onpointermove?: HTMLElementEventListenerAttribute<PointerEvent>;
+    onpointerout?: HTMLElementEventListenerAttribute<PointerEvent>;
+    onpointerover?: HTMLElementEventListenerAttribute<PointerEvent>;
+    onpointerup?: HTMLElementEventListenerAttribute<PointerEvent>;
+    onprogress?: HTMLElementEventListenerAttribute<ProgressEvent>;
+    onratechange?: HTMLElementEventListenerAttribute<Event>;
+    onreset?: HTMLElementEventListenerAttribute<Event>;
+    onresize?: HTMLElementEventListenerAttribute<UIEvent>;
+    onscroll?: HTMLElementEventListenerAttribute<Event>;
+    onsecuritypolicyviolation?: HTMLElementEventListenerAttribute<SecurityPolicyViolationEvent>;
+    onseeked?: HTMLElementEventListenerAttribute<Event>;
+    onseeking?: HTMLElementEventListenerAttribute<Event>;
+    onselect?: HTMLElementEventListenerAttribute<Event>;
+    onselectionchange?: HTMLElementEventListenerAttribute<Event>;
+    onselectstart?: HTMLElementEventListenerAttribute<Event>;
+    onslotchange?: HTMLElementEventListenerAttribute<Event>;
+    onstalled?: HTMLElementEventListenerAttribute<Event>;
+    onsubmit?: HTMLElementEventListenerAttribute<SubmitEvent>;
+    onsuspend?: HTMLElementEventListenerAttribute<Event>;
+    ontimeupdate?: HTMLElementEventListenerAttribute<Event>;
+    ontoggle?: HTMLElementEventListenerAttribute<Event>;
+    ontouchcancel?: HTMLElementEventListenerAttribute<TouchEvent>;
+    ontouchend?: HTMLElementEventListenerAttribute<TouchEvent>;
+    ontouchmove?: HTMLElementEventListenerAttribute<TouchEvent>;
+    ontouchstart?: HTMLElementEventListenerAttribute<TouchEvent>;
+    ontransitioncancel?: HTMLElementEventListenerAttribute<TransitionEvent>;
+    ontransitionend?: HTMLElementEventListenerAttribute<TransitionEvent>;
+    ontransitionrun?: HTMLElementEventListenerAttribute<TransitionEvent>;
+    ontransitionstart?: HTMLElementEventListenerAttribute<TransitionEvent>;
+    onvolumechange?: HTMLElementEventListenerAttribute<Event>;
+    onwaiting?: HTMLElementEventListenerAttribute<Event>;
+    onwebkitanimationend?: HTMLElementEventListenerAttribute<Event>;
+    onwebkitanimationiteration?: HTMLElementEventListenerAttribute<Event>;
+    onwebkitanimationstart?: HTMLElementEventListenerAttribute<Event>;
+    onwebkittransitionend?: HTMLElementEventListenerAttribute<Event>;
 };
 
-export type Attributes = {
-    style?: StyleAttributes;
-} & ElementAttributes;
-
-type AttributeKey = keyof ElementAttributes;  // TODO: add more
-
-const attributeKeyNames: Set<string> = new Set([
-    'id',
-    'innerText',
-    // event handlers
-    'onabort',
-    'onanimationcancel',
-    'onanimationend',
-    'onanimationiteration',
-    'onanimationstart',
-    'onauxclick',
-    'onbeforeinput',
-    'onblur',
-    'oncancel',
-    'oncanplay',
-    'oncanplaythrough',
-    'onchange',
-    'onclick',
-    'onclose',
-    'oncontextmenu',
-    'oncopy',
-    'oncuechange',
-    'oncut',
-    'ondblclick',
-    'ondrag',
-    'ondragend',
-    'ondragenter',
-    'ondragleave',
-    'ondragover',
-    'ondragstart',
-    'ondrop',
-    'ondurationchange',
-    'onemptied',
-    'onended',
-    'onerror',
-    'onfocus',
-    'onformdata',
-    'ongotpointercapture',
-    'oninput',
-    'oninvalid',
-    'onkeydown',
-    'onkeypress',
-    'onkeyup',
-    'onload',
-    'onloadeddata',
-    'onloadedmetadata',
-    'onloadstart',
-    'onlostpointercapture',
-    'onmousedown',
-    'onmouseenter',
-    'onmouseleave',
-    'onmousemove',
-    'onmouseout',
-    'onmouseover',
-    'onmouseup',
-    'onpaste',
-    'onpause',
-    'onplay',
-    'onplaying',
-    'onpointercancel',
-    'onpointerdown',
-    'onpointerenter',
-    'onpointerleave',
-    'onpointermove',
-    'onpointerout',
-    'onpointerover',
-    'onpointerup',
-    'onprogress',
-    'onratechange',
-    'onreset',
-    'onresize',
-    'onscroll',
-    'onsecuritypolicyviolation',
-    'onseeked',
-    'onseeking',
-    'onselect',
-    'onselectionchange',
-    'onselectstart',
-    'onslotchange',
-    'onstalled',
-    'onsubmit',
-    'onsuspend',
-    'ontimeupdate',
-    'ontoggle',
-    'ontouchcancel',
-    'ontouchend',
-    'ontouchmove',
-    'ontouchstart',
-    'ontransitioncancel',
-    'ontransitionend',
-    'ontransitionrun',
-    'ontransitionstart',
-    'onvolumechange',
-    'onwaiting',
-]);
-
-function isAttributeKey(name: string): name is AttributeKey {
-    return attributeKeyNames.has(name);
-}
-
-function createElement<K extends keyof HTMLElementTagNameMap>(tagName: K, attributes: Attributes, children: (HTMLElement | OpaqueRenderedElement)[]): HTMLElementTagNameMap[K] {
+function createElement<ElementT, AttributesT extends HTMLElementAttributesBase>(tagName: string, attributes: AttributesT, children: (HTMLElement | OpaqueRenderedElement)[] | undefined = undefined): ElementT {
     const e = document.createElement(tagName);
 
     if (attributes.style !== undefined) {
         applyStyles(e, attributes.style);
     }
 
-    let bindState: State<ElementAttributes[AttributeKey]>[] | undefined;
-    let bindName: AttributeKey[] | undefined;
+    let bindState: (State<any> | MappedState<any, any>)[] | undefined;
+    let bindName: string[] | undefined;
     for (const name in attributes) {
-        if (isAttributeKey(name)) {
+        if (Object.hasOwn(attributes, name) && name !== 'style') {
             const value = attributes[name];
-            if (value instanceof State) {
+            if (value instanceof State || value instanceof MappedState) {
                 (bindState = bindState || []).push(value);
                 (bindName = bindName || []).push(name);
             } else if (value !== undefined) {
-                (e as any)[name] = value; // TODO: is there a way to typecheck this?
+                (e as any)[name] = value;
             }
         }
     }
@@ -682,30 +249,113 @@ function createElement<K extends keyof HTMLElementTagNameMap>(tagName: K, attrib
         const bindNameNotUndefined = bindName;
         uiBind(e, e => {
             for (let i = 0; i < bindStateNotUndefined.length; i++) {
-                (e[bindNameNotUndefined[i]] as any) = bindStateNotUndefined[i].get();  // TODO: how to typecheck this?
+                ((e as any)[bindNameNotUndefined[i]] as any) = bindStateNotUndefined[i].get();
             }
         });
     }
 
-    for (const child of children) {
-        e.appendChild(child as HTMLElement);
+    if (children !== undefined) {
+        for (const child of children) {
+            e.appendChild(child as HTMLElement);
+        }
     }
-
-    return e;
+    
+    return e as ElementT;
 }
 
-export function div(attributes: Attributes, ...children: (HTMLElement | OpaqueRenderedElement)[]): HTMLDivElement {
+export type HTMLElementAttributes = HTMLElementAttributesBase;
+
+export type HTMLDivElementAttributes = HTMLElementAttributesBase;
+
+export function div(attributes: HTMLDivElementAttributes, ...children: (HTMLElement | OpaqueRenderedElement)[]): HTMLDivElement {
     return createElement('div', attributes, children);
 }
 
-export function span(attributes: Attributes, ...children: (HTMLElement | OpaqueRenderedElement)[]): HTMLSpanElement {
+export type HTMLSpanElementAttributes = HTMLElementAttributesBase;
+
+export function span(attributes: HTMLSpanElementAttributes, ...children: (HTMLElement | OpaqueRenderedElement)[]): HTMLSpanElement {
     return createElement('span', attributes, children);
 }
 
-export function ul(attributes: Attributes, ...children: (HTMLElement | OpaqueRenderedElement)[]): HTMLUListElement {
+export type HTMLUListElementAttributes = HTMLElementAttributesBase;
+
+export function ul(attributes: HTMLUListElementAttributes, ...children: (HTMLElement | OpaqueRenderedElement)[]): HTMLUListElement {
     return createElement('ul', attributes, children);
 }
 
-export function li(attributes: Attributes, ...children: (HTMLElement | OpaqueRenderedElement)[]): HTMLLIElement {
+export type HTMLLIElementAttributes = HTMLElementAttributesBase;
+
+export function li(attributes: HTMLLIElementAttributes, ...children: (HTMLElement | OpaqueRenderedElement)[]): HTMLLIElement {
     return createElement('li', attributes, children);
+}
+
+export type HTMLInputElementAttributes = {
+    accept?: HTMLElementAttribute<string>;
+    alt?: HTMLElementAttribute<string>;
+    autocomplete?: HTMLElementAttribute<AutoFill>;
+    capture?: HTMLElementAttribute<string>;
+    checked?: HTMLElementAttribute<boolean>;
+    defaultChecked?: HTMLElementAttribute<boolean>;
+    defaultValue?: HTMLElementAttribute<string>;
+    dirName?: HTMLElementAttribute<string>;
+    disabled?: HTMLElementAttribute<boolean>;
+    formAction?: HTMLElementAttribute<string>;
+    formEnctype?: HTMLElementAttribute<string>;
+    formMethod?: HTMLElementAttribute<string>;
+    formNoValidate?: HTMLElementAttribute<boolean>;
+    formTarget?: HTMLElementAttribute<string>;
+    height?: HTMLElementAttribute<number>;
+    indeterminate?: HTMLElementAttribute<boolean>;
+    max?: HTMLElementAttribute<string>;
+    maxLength?: HTMLElementAttribute<number>;
+    min?: HTMLElementAttribute<string>;
+    minLength?: HTMLElementAttribute<number>;
+    multiple?: HTMLElementAttribute<boolean>;
+    name?: HTMLElementAttribute<string>;
+    pattern?: HTMLElementAttribute<string>;
+    placeholder?: HTMLElementAttribute<string>;
+    readOnly?: HTMLElementAttribute<boolean>;
+    required?: HTMLElementAttribute<boolean>;
+    selectionDirection?: HTMLElementAttribute<"forward" | "backward" | "none" | null>;
+    selectionEnd?: HTMLElementAttribute<number | null>;
+    selectionStart?: HTMLElementAttribute<number | null>;
+    size?: HTMLElementAttribute<number>;
+    src?: HTMLElementAttribute<string>;
+    step?: HTMLElementAttribute<string>;
+    type?: HTMLElementAttribute<string>;
+    useMap?: HTMLElementAttribute<string>;
+    value?: HTMLElementAttribute<string>;
+    valueAsDate?: HTMLElementAttribute<Date | null>;
+    valueAsNumber?: HTMLElementAttribute<number>;
+    webkitdirectory?: HTMLElementAttribute<boolean>;
+    width?: HTMLElementAttribute<number>;
+} & HTMLElementAttributesBase;
+
+export function input(attributes: HTMLInputElementAttributes, ...children: (HTMLElement | OpaqueRenderedElement)[]): HTMLInputElement {
+    return createElement('input', attributes, children);
+}
+
+export type HTMLCanvasElementAttributes = {
+    height?: HTMLElementAttribute<number>;
+    width?: HTMLElementAttribute<number>;
+} & HTMLElementAttributesBase;
+
+export function canvas(attributes: HTMLCanvasElementAttributes, ...children: (HTMLElement | OpaqueRenderedElement)[]): HTMLCanvasElement {
+    return createElement('canvas', attributes, children);
+}
+
+export type HTMLButtonElementAttributes = {
+    disabled?: HTMLElementAttribute<boolean>;
+    formAction?: HTMLElementAttribute<string>;
+    formEnctype?: HTMLElementAttribute<string>;
+    formMethod?: HTMLElementAttribute<string>;
+    formNoValidate?: HTMLElementAttribute<boolean>;
+    formTarget?: HTMLElementAttribute<string>;
+    name?: HTMLElementAttribute<string>;
+    type?: HTMLElementAttribute<"submit" | "reset" | "button">;
+    value?: HTMLElementAttribute<string>;
+} & HTMLElementAttributesBase;
+
+export function button(attributes: HTMLElementAttributes, ...children: (HTMLElement | OpaqueRenderedElement)[]): HTMLButtonElement {
+    return createElement('button', attributes, children);
 }
