@@ -1,13 +1,14 @@
 
-// TODO: have Rendering and Bindind remember State that is created, and then re-use on later rendering.
-// Probably best to have a name (or number or symbol) for state.
-
 class HasStateDep {
-    // TODO: depth?
+    // TODO: check that we have at least one stateDeps? And log a warning saying that something is unnecessary.
+    // TODO: remove generation.
     private stateDeps: Map<State<any>, number>; // State -> generation.
+
+    private stateMade: Map<string | number | Symbol, State<any>> | undefined;   // Key -> State
 
     constructor() {
         this.stateDeps = new Map();
+        this.stateMade = undefined;
     }
 
     addDep(s: State<any>, gen: number): void {
@@ -19,6 +20,32 @@ class HasStateDep {
             dep[uiStateDetach](this);
         }
         this.stateDeps.clear();
+    }
+
+    makeState<T>(key: string | number | Symbol, value: T): State<T> {
+        if (this.stateMade === undefined) {
+            this.stateMade = new Map();
+        }
+        let s = this.stateMade.get(key);
+        if (s === undefined) {
+            s = new State(value);
+            this.stateMade.set(key, s);
+        }
+        return s;
+    }
+};
+
+
+let inUIStateCall = false;
+export function uiState<T>(key: string | number | Symbol, value: T): State<T> {
+    inUIStateCall = true;
+    try {
+        if (contextStack.length === 0) {
+            throw new Error('uiState called outside of render or bind function');
+        }
+        return contextStack[contextStack.length-1].makeState(key, value);
+    } finally {
+        inUIStateCall = false;
     }
 }
 
@@ -267,6 +294,10 @@ export class State<T> {
         this.value = value;
         this.gen = 0;
         this.deps = new Set();
+
+        if (contextStack.length !== 0 && !inUIStateCall) {
+            throw new Error('use uiState call to create state inside render and bind functions');
+        }
     }
 
     [uiStateDetach](dep: HasStateDep) {

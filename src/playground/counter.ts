@@ -1,10 +1,10 @@
 import { button, div } from "../dom.js";
-import { uiRoot, uiComponent, State } from "../ui.js";
+import { uiRoot, uiComponent, uiState } from "../ui.js";
 
 
 function run(container: HTMLElement) {
     uiRoot(container, uiComponent(() => {
-        const counter = new State(0);
+        const counter = uiState('counter', 0);
         return div(
             { style: {
                     display: 'grid',
