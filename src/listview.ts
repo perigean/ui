@@ -1,4 +1,4 @@
-import { OpaqueRenderedElement, State, uiComponent } from "./ui.js";
+import { OpaqueRenderedElement, State, uiComponent, uiState } from "./ui.js";
 
 import { HTMLElementAttributes, div } from "./dom.js"
 
@@ -26,9 +26,9 @@ const VirtualRows = uiComponent(function VirtualRows<T>(rows: State<VirtualRow<T
 });
 
 export const ListView = uiComponent(function ListView<T>(attributes: HTMLElementAttributes, data: ListViewData<T>, renderRow: (s: State<T>, attributes: HTMLElementAttributes) => OpaqueRenderedElement): HTMLElement {
-    const rowCount = new State<number>(data.count);
+    const rowCount = uiState('rowCount', data.count);
     let rows: {s: State<T>, i: number, iState: State<string>}[] = [];
-    const rowsState = new State<VirtualRow<T>[]>(rows);
+    const rowsState = uiState('rows', rows);
     const scroller = div({}, VirtualRows(rowsState, rowCount, data.rowHeight, renderRow));
 
     const viewport = div(attributes, scroller);

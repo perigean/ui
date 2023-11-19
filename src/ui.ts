@@ -62,6 +62,8 @@ class Binding extends HasStateDep {
     }
 
     bindThis() {
+        // Clear previous state deps.
+        this.detach();
         contextStack.push(this);
         try {
             this.callback(this.e);
@@ -127,6 +129,8 @@ class Rendering<ArgsT extends any[]> extends HasStateDep {
     private renderThisContextHelper(): HTMLElement {
         contextStack.push(this);
         try {
+            // Clear previous state deps.
+            this.detach();
             return this.render(...this.args);
         } finally {
             if (this !== contextStack.pop()) {
