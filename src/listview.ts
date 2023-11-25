@@ -6,85 +6,108 @@ import { HTMLElementAttributes, div } from "./dom.js"
 
 export interface ListViewData<T> {
     get: (i: number) => T;
-    onChange?: () => void;
-    count: number;
-    rowHeight: number;
-    renderRange: number;
-}
+    freshData: () => AsyncGenerator<number>;
+};
 
 type VirtualRow<T> = {
     s: State<T>;
-    i: number;
-    iState: State<string>;
+    i: State<number>;  // TODO: get ris of i, only iState, used mapped state for setting gridRow.
 };
 
-const VirtualRows = uiComponent(function VirtualRows<T>(rows: State<VirtualRow<T>[]>, rowCount: State<number>, rowHeight: number, renderRow: (s: State<T>, attributes: HTMLElementAttributes) => OpaqueRenderedElement): HTMLElement {
+function rowToGridRow(r: number): string {
+    return (r + 1).toString();
+}
+
+const VirtualRows = uiComponent(function VirtualRows<T>(dataCount: State<number>, rows: State<VirtualRow<T>[]>, rowHeight: number, renderRow: (s: State<T>, attributes: HTMLElementAttributes) => OpaqueRenderedElement): HTMLElement {
     return div(
-        {style: { display: 'grid', gridTemplateRows: `repeat(${rowCount.get()}, ${rowHeight}px)`}},
-        ...rows.get().map(r => renderRow(r.s, { style: { gridRow: r.iState } })),
+        {style: { display: 'grid', gridTemplateRows: dataCount.map(c => `repeat(${c}, ${rowHeight}px)`) }},
+        ...rows.get().map(r => renderRow(r.s, { style: { gridRow: r.i.map(rowToGridRow) } })),
     );
 });
 
-export const ListView = uiComponent(function ListView<T>(attributes: HTMLElementAttributes, data: ListViewData<T>, renderRow: (s: State<T>, attributes: HTMLElementAttributes) => OpaqueRenderedElement): HTMLElement {
-    const rowCount = uiState('rowCount', data.count);
-    let rows: {s: State<T>, i: number, iState: State<string>}[] = [];
-    const rowsState = uiState('rows', rows);
-    const scroller = div({}, VirtualRows(rowsState, rowCount, data.rowHeight, renderRow));
+export const ListView = uiComponent(function ListView<T>(attributes: HTMLElementAttributes, data: ListViewData<T>, rowHeight: number, renderRange: number, renderRow: (s: State<T>, attributes: HTMLElementAttributes) => OpaqueRenderedElement): HTMLElement {
+    // State.
+    const dataCount = uiState<number>('dataCount', 0);
+    const virtualRows = uiState<VirtualRow<T>[]>('virtualRows', []);
 
+    // Containers.
+    const scroller = div({}, VirtualRows(dataCount, virtualRows, rowHeight, renderRow));
     const viewport = div(attributes, scroller);
     viewport.style.overflowY = 'scroll';
     
-    function updateRows() { 
-        const newNumRows = Math.min(
-            Math.ceil(viewport.clientHeight * data.renderRange / data.rowHeight),
-            data.count,
+    function updateRows() {
+        const count = dataCount.get();
+        // What we have, keyed by value, then index?
+        const freshVirtualCount = Math.min(
+            Math.ceil(viewport.clientHeight * renderRange / rowHeight),
+            count,
         );
-        const newTopRow = Math.min(
+        const freshTopIndex = Math.min(
             Math.max(
-                Math.floor((viewport.scrollTop - viewport.clientHeight * (data.renderRange - 1) * 0.5) / data.rowHeight),
+                Math.floor((viewport.scrollTop - viewport.clientHeight * (renderRange - 1) * 0.5) / rowHeight),
                 0,
             ),
-            data.count - newNumRows,
+            count - freshVirtualCount,
         );
-        const neededIndices = new Set<number>();
-        for (let i = 0; i < newNumRows; i++) {
-            neededIndices.add(newTopRow + i);
-        }
-        const freshRows: VirtualRow<T>[] = [];
-        const staleRows: VirtualRow<T>[] = [];
-        for (const row of rows) {
-            if (neededIndices.delete(row.i)) {
-                // Row was at a needed index, so it's fresh.
-                freshRows.push(row);
+        const staleVirtualRows: VirtualRow<T>[] = virtualRows.get();
+        const freshVirtualRows: (VirtualRow<T> | undefined)[] = new Array(freshVirtualCount);
+        const staleMap = new Map<T, VirtualRow<T>[]>();
+        for (let i = 0; i < staleVirtualRows.length; i++) {
+            const vr = staleVirtualRows[i];
+            const vri = vr.i.get();
+            const vrs = vr.s.get();
+            if (vri >= freshTopIndex && vri < freshTopIndex + freshVirtualCount && vrs === data.get(vri)) {
+                // Row position and data value are fresh, copy to output.
+                freshVirtualRows[vri - freshTopIndex] = vr;
             } else {
-                staleRows.push(row);
+                // Row index or value is stale, put in staleMap for processing.
+                let sameValue = staleMap.get(vrs);
+                if (sameValue === undefined) {
+                    sameValue = [];
+                    staleMap.set(vrs, sameValue);
+                }
+                sameValue.push(vr);
             }
         }
-        // Update stale rows and add new ones if we run out of stale ones to reuse.
-        let rowAdded = false;
-        for (const i of neededIndices) {
-            const staleRow = staleRows.pop();
-            if (staleRow !== undefined) {
-                staleRow.i = i;
-                staleRow.iState.set(`${i}`);
-                staleRow.s.set(data.get(i));
-                freshRows.push(staleRow);
-            } else {
-                rowAdded = true;
-                const iState = new State<string>(`${i}`);
-                const s = new State<T>(data.get(i));
-                freshRows.push({s, i, iState});
+
+        // Find rows with the right values.
+        for (let i = 0; i < freshVirtualCount; i++) {
+            if (freshVirtualRows[i] === undefined) {
+                // We need a row here, is there already one with the right value?
+                const sameValue = staleMap.get(data.get(freshTopIndex + i));
+                if (sameValue !== undefined && sameValue.length > 0) {
+                    const vr = sameValue.pop() as VirtualRow<T>;
+                    vr.i.set(i + freshTopIndex);
+                    freshVirtualRows[i] = vr;
+                }
             }
         }
-        if (freshRows.length === rows.length) {
-            // We can re-use rows, since we didn't create or delete any row.
-            if (staleRows.length !== 0 || rowAdded) {
-                throw new Error('some rows added or left stale');
+
+        // Fill in the rest of the rows.
+        const staleArray = [...staleMap.values()].flat(1);
+        let madeNewVirtualRow = false;
+        for (let i = 0; i < freshVirtualCount; i++) {
+            if (freshVirtualRows[i] === undefined) {
+                const vri = i + freshTopIndex;
+                const vrs = data.get(vri);
+                if (staleArray.length > 0) {
+                    const vr = staleArray.pop() as VirtualRow<T>;
+                    vr.i.set(vri);
+                    vr.s.set(vrs);
+                } else {
+                    freshVirtualRows[i] = {
+                        s: new State<T>(vrs),
+                        i: new State<number>(vri),
+                    };
+                    madeNewVirtualRow = true;
+                }
             }
-            // No need to do anything, since the contents of rows have been mutated.
-        } else {
-            // We need to re-render VirtualRows, since we added or removed some rendered rows.
-            rowsState.set(freshRows);
+        }
+
+        if (madeNewVirtualRow || staleArray.length > 0) {
+            // We made new rows, or didn't use all the stale ones, so the number of rows changed.
+            // We need to re-render VirtualRows.
+            virtualRows.set(freshVirtualRows as VirtualRow<T>[]);
         }
     };
 
@@ -96,9 +119,15 @@ export const ListView = uiComponent(function ListView<T>(attributes: HTMLElement
     });
     ro.observe(viewport);
 
-    // TODO: make scroller, which uses State to capture how many containers get rendered.
-    // TODO: listen to resize events on scroller, which sets the virtual window size (this has to be done via State, since it will render)
-    // TODO: make container divs
+    // TODO: This will leak, cancel this iteration when unmounted.
+    const freshData = data.freshData();
+
+    (async () => {
+         for await (const count of freshData) {
+            dataCount.set(count);
+            updateRows();
+         }
+    })();
 
     return viewport;
 });
