@@ -11,30 +11,59 @@ export interface ListViewData<T> {
 
 type VirtualRow<T> = {
     s: State<T>;
-    i: State<number>;  // TODO: get ris of i, only iState, used mapped state for setting gridRow.
+    i: State<number>;
+    attributes: HTMLElementAttributes;
 };
 
-function rowToGridRow(r: number): string {
-    return (r + 1).toString();
+function indexToGridRow(r: number): string {
+    return (r + 2).toString();
 }
 
-const VirtualRows = uiComponent(function VirtualRows<T>(dataCount: State<number>, rows: State<VirtualRow<T>[]>, rowHeight: number, renderRow: (s: State<T>, attributes: HTMLElementAttributes) => OpaqueRenderedElement): HTMLElement {
+const VirtualRows = uiComponent(function VirtualRows<T>(
+    dataCount: State<number>,
+    rows: State<VirtualRow<T>[]>,
+    rowHeight: number,
+    renderRow: (s: State<T>, attributes: HTMLElementAttributes) => OpaqueRenderedElement,
+    renderHeader: ((attributes: HTMLElementAttributes) => OpaqueRenderedElement) | undefined,
+): HTMLElement {
+    const children: OpaqueRenderedElement[] = [];
+    let headerTemplate = '0px';
+    if (renderHeader !== undefined) {
+        children.push(renderHeader({style: { gridRow: '1', position: 'sticky', top: '0px'}}));
+        headerTemplate = `${rowHeight}px`;
+    }
+    for (const row of rows.get()) {
+        children.push(renderRow(row.s, row.attributes));
+    }
     return div(
-        {style: { display: 'grid', gridTemplateRows: dataCount.map(c => `repeat(${c}, ${rowHeight}px)`) }},
-        ...rows.get().map(r => renderRow(r.s, { style: { gridRow: r.i.map(rowToGridRow) } })),
+        {
+            style: {
+                display: 'grid',
+                gridTemplateRows: dataCount.map(c => `${headerTemplate} repeat(${c}, ${rowHeight}px)`),
+            }
+        },
+        ...children,
     );
 });
 
-export const ListView = uiComponent(function ListView<T>(attributes: HTMLElementAttributes, data: ListViewData<T>, rowHeight: number, renderRange: number, renderRow: (s: State<T>, attributes: HTMLElementAttributes) => OpaqueRenderedElement): HTMLElement {
+// TODO: add header.
+export const ListView = uiComponent(function ListView<T>(
+    attributes: HTMLElementAttributes,
+    data: ListViewData<T>,
+    rowHeight: number,
+    renderRange: number,
+    renderRow: (s: State<T>, attributes: HTMLElementAttributes) => OpaqueRenderedElement,
+    renderHeader: ((attributes: HTMLElementAttributes) => OpaqueRenderedElement) | undefined = undefined,
+): HTMLElement {
     // State.
     const dataCount = uiState<number>('dataCount', 0);
     const virtualRows = uiState<VirtualRow<T>[]>('virtualRows', []);
 
     // Containers.
-    const scroller = div({}, VirtualRows(dataCount, virtualRows, rowHeight, renderRow));
+    const scroller = div({}, VirtualRows(dataCount, virtualRows, rowHeight, renderRow, renderHeader));
     const viewport = div(attributes, scroller);
     viewport.style.overflowY = 'scroll';
-    
+
     function updateRows() {
         const count = dataCount.get();
         // What we have, keyed by value, then index?
@@ -95,11 +124,15 @@ export const ListView = uiComponent(function ListView<T>(attributes: HTMLElement
                     vr.i.set(vri);
                     vr.s.set(vrs);
                 } else {
+                    const vriState = new State(vri);
                     freshVirtualRows[i] = {
-                        s: new State<T>(vrs),
-                        i: new State<number>(vri),
+                        s: new State(vrs),
+                        i: vriState,
+                        // Cache attributes, so we don't have to compare them in the re-render.
+                        attributes: { style: { gridRow: vriState.map(indexToGridRow) } },
                     };
                     madeNewVirtualRow = true;
+                    console.log('made new row');
                 }
             }
         }
@@ -123,10 +156,10 @@ export const ListView = uiComponent(function ListView<T>(attributes: HTMLElement
     const freshData = data.freshData();
 
     (async () => {
-         for await (const count of freshData) {
+        for await (const count of freshData) {
             dataCount.set(count);
             updateRows();
-         }
+        }
     })();
 
     return viewport;

@@ -14,7 +14,7 @@ function run(container: HTMLElement) {
             return `row ${i}`;
         },
         freshData: async function*() {
-            for (let i = 1; i < 100; i++) {
+            for (let i = 1; i < 10; i++) {
                 await sleep(100);
                 yield i * 1000;
             }
@@ -25,9 +25,19 @@ function run(container: HTMLElement) {
         return div({innerText: s, ...attributes});
     });
 
+    const header = uiComponent((attributes: HTMLElementAttributes): HTMLElement => {
+        // TODO: better way of merging attributes.
+        const a = {innerText: 'header', ...attributes};
+        if (a.style !== undefined) {
+            a.style.background = 'white';
+            a.style.borderBottom = '1px solid black';
+        }
+        return div(a);
+    });
+
     uiRoot(container, ListView, {style: {
         height: '100%',
-    }}, data, 32, 3.0, row);
+    }}, data, 32, 3.0, row, header);
 }
 
 run(document.getElementById('body') as HTMLElement);

@@ -212,6 +212,7 @@ class Rendering<ArgsT extends any[]> extends HasStateDep {
             // Previously rendered callee has same render and args.
             // NB: If prevCallee has stale state, it will be visited later in the current setStateWorker call, so it's OK to use it unchanged.
             this.currCallees.add(prevCallee);
+            console.log('rendering previous callee');
             if (prevCallee.e === null) {
                 throw new Error('prevCallee is not attached');
             }
@@ -229,7 +230,7 @@ class Rendering<ArgsT extends any[]> extends HasStateDep {
 const uiRendering = Symbol('this element was returned by a render function');
 const uiBinding = Symbol('this element has bound data');
 
-// TODO: comment on how this subtree shouldn't be touched.
+// Don't mutate stuff under an OpaqueRenderedElement, it will break things.
 export type OpaqueRenderedElement = {[uiRendering]: Rendering<any> };
 
 type RenderedElement<ArgsT extends any[]> = HTMLElement & { [uiRendering]: Rendering<ArgsT> };
@@ -238,6 +239,7 @@ type MaybeRenderedElement<ArgsT extends any[]> = HTMLElement & { [uiRendering]?:
 type MaybeBoundElement = HTMLElement & { [uiBinding]?: Binding };
 type MaybeBoundRenderedElement<ArgsT extends any[]> = HTMLElement & { [uiBinding]?: Binding; [uiRendering]?: Rendering<ArgsT> };
 
+// TODO: add optinonal args comparison function, so e.g. attributes that compare equal don't cause a re-render.
 export function uiComponent<ArgsT extends any[]>(render: (...args: ArgsT) => HTMLElement): (...args: ArgsT) => OpaqueRenderedElement {
     return function uiRenderWrapper(...args: ArgsT): RenderedElement<ArgsT> {
         // Check the state of the context stack.
@@ -342,22 +344,30 @@ export class State<T> {
         return pendingWork.promise;
     }
 
-    map<MappedT>(f: (v: T) => MappedT): MappedState<T, MappedT> {
-        return new MappedState(this, f);
+    map<MappedT>(f: (v: T) => MappedT): MappedState<[T], MappedT> {
+        return new MappedState(f, this);
     }
 };
 
-export class MappedState<StateT, T> {
-    private f: (v: StateT) => T;
-    private s: State<StateT>;
+export function mapState<ArgsT extends any[], T>(f: (...args: ArgsT) => T, ...s: StatesFromArgs<ArgsT>): MappedState<ArgsT, T> {
+    return new MappedState(f, ...s);
+}
 
-    constructor(s: State<StateT>, f: (v: StateT) => T) {
+
+
+type StatesFromArgs<ArgsT extends any[]> = { [Index in keyof ArgsT]: State<ArgsT[Index]>};
+
+export class MappedState<ArgsT extends any[], T> {
+    private f: (...args: ArgsT) => T;
+    private s: StatesFromArgs<ArgsT>;
+
+    constructor(f: (...args: ArgsT) => T, ...s: StatesFromArgs<ArgsT>) {
         this.f = f;
         this.s = s;
     }
 
     get(): T {
-        return this.f(this.s.get());
+        return this.f(...this.s.map(s => s.get()) as ArgsT);
     }
 };
 
