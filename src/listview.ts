@@ -1,6 +1,6 @@
 import { OpaqueRenderedElement, State, uiComponent, uiState } from "./ui.js";
 
-import { HTMLElementAttributes, div } from "./dom.js"
+import { HTMLElementAttributes, HTMLElementStyleAttributes, div } from "./dom.js"
 
 // TODO: llistview of dygraph to see if it's fast.
 
@@ -12,7 +12,7 @@ export interface ListViewData<T> {
 type VirtualRow<T> = {
     s: State<T>;
     i: State<number>;
-    attributes: HTMLElementAttributes;
+    style: HTMLElementStyleAttributes;
 };
 
 function indexToGridRow(r: number): string {
@@ -23,17 +23,17 @@ const VirtualRows = uiComponent(function VirtualRows<T>(
     dataCount: State<number>,
     rows: State<VirtualRow<T>[]>,
     rowHeight: number,
-    renderRow: (s: State<T>, attributes: HTMLElementAttributes) => OpaqueRenderedElement,
-    renderHeader: ((attributes: HTMLElementAttributes) => OpaqueRenderedElement) | undefined,
+    renderRow: (s: State<T>, style: HTMLElementStyleAttributes) => OpaqueRenderedElement,
+    renderHeader: ((style: HTMLElementStyleAttributes) => OpaqueRenderedElement) | undefined,
 ): HTMLElement {
     const children: OpaqueRenderedElement[] = [];
     let headerTemplate = '0px';
     if (renderHeader !== undefined) {
-        children.push(renderHeader({style: { gridRow: '1', position: 'sticky', top: '0px'}}));
+        children.push(renderHeader({ gridRow: '1', position: 'sticky', top: '0px'}));
         headerTemplate = `${rowHeight}px`;
     }
     for (const row of rows.get()) {
-        children.push(renderRow(row.s, row.attributes));
+        children.push(renderRow(row.s, row.style));
     }
     return div(
         {
@@ -52,8 +52,8 @@ export const ListView = uiComponent(function ListView<T>(
     data: ListViewData<T>,
     rowHeight: number,
     renderRange: number,
-    renderRow: (s: State<T>, attributes: HTMLElementAttributes) => OpaqueRenderedElement,
-    renderHeader: ((attributes: HTMLElementAttributes) => OpaqueRenderedElement) | undefined = undefined,
+    renderRow: (s: State<T>, style: HTMLElementStyleAttributes) => OpaqueRenderedElement,
+    renderHeader: ((attributes: HTMLElementStyleAttributes) => OpaqueRenderedElement) | undefined = undefined,
 ): HTMLElement {
     // State.
     const dataCount = uiState<number>('dataCount', 0);
@@ -128,8 +128,8 @@ export const ListView = uiComponent(function ListView<T>(
                     freshVirtualRows[i] = {
                         s: new State(vrs),
                         i: vriState,
-                        // Cache attributes, so we don't have to compare them in the re-render.
-                        attributes: { style: { gridRow: vriState.map(indexToGridRow) } },
+                        // Cache style, so we don't have to compare them in the re-render.
+                        style: { gridRow: vriState.map(indexToGridRow) },
                     };
                     madeNewVirtualRow = true;
                     console.log('made new row');

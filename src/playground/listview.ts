@@ -1,4 +1,4 @@
-import { HTMLElementAttributes, div } from "../dom.js";
+import { HTMLElementAttributes, HTMLElementStyleAttributes, div } from "../dom.js";
 import { ListView, ListViewData } from "../listview.js";
 import { State, uiRoot, uiComponent } from "../ui.js";
 
@@ -21,18 +21,12 @@ function run(container: HTMLElement) {
         },
     };
 
-    const row = uiComponent((s: State<string>, attributes: HTMLElementAttributes): HTMLElement => {
-        return div({innerText: s, ...attributes});
+    const row = uiComponent((s: State<string>, style: HTMLElementStyleAttributes): HTMLElement => {
+        return div({innerText: s, style});
     });
 
-    const header = uiComponent((attributes: HTMLElementAttributes): HTMLElement => {
-        // TODO: better way of merging attributes.
-        const a = {innerText: 'header', ...attributes};
-        if (a.style !== undefined) {
-            a.style.background = 'white';
-            a.style.borderBottom = '1px solid black';
-        }
-        return div(a);
+    const header = uiComponent((style: HTMLElementStyleAttributes): HTMLElement => {
+        return div({innerText: 'header', style: {...style, background: 'white', borderBottom: '1px solid black' }});
     });
 
     uiRoot(container, ListView, {style: {

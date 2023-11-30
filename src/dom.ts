@@ -16,11 +16,11 @@ type WriteableStyleKey = {
     [K in keyof CSSStyleDeclaration]: Writeable<CSSStyleDeclaration, K> extends true ? (K extends string ? (CSSStyleDeclaration[K] extends string ? K : never) : never) : never;
 }[keyof CSSStyleDeclaration];
 
-type StyleAttributes = {
+export type HTMLElementStyleAttributes = {
     [K in WriteableStyleKey]?: string | State<string> | MappedState<any, string>;
 }
 
-function applyStyles(e: HTMLElement, style: StyleAttributes) {
+function applyStyles(e: HTMLElement, style: HTMLElementStyleAttributes) {
     let bindState: (State<string> | MappedState<any, string>)[] | undefined;
     let bindName: string[] | undefined;
     for (const name in style) {
@@ -58,7 +58,7 @@ type HTMLElementEventListenerAttribute<EventT>
 
 // The base set of attributes shared by all HTML Elements.
 type HTMLElementAttributesBase = {
-    style?: StyleAttributes;
+    style?: HTMLElementStyleAttributes;
 
     accessKey?: HTMLElementAttribute<string>;
     autocapitalize?: HTMLElementAttribute<string>;
