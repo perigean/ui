@@ -46,7 +46,6 @@ const VirtualRows = uiComponent(function VirtualRows<T>(
     );
 });
 
-// TODO: add header.
 export const ListView = uiComponent(function ListView<T>(
     attributes: HTMLElementAttributes,
     data: ListViewData<T>,
@@ -112,8 +111,24 @@ export const ListView = uiComponent(function ListView<T>(
             }
         }
 
+        //Find rows with the right indices.
+        // NB: For some reason, this stops run-away scrolling. It's like the scroller wants to follow attached elements or something.
+        // TODO: figure out why this is. Also, maybe experiment with detaching elements during mutation by binding to see if it helps.
+        const staleArray: VirtualRow<T>[] = []; // Array of completely stale VirtualRows, s and i don't match anything in freshVirtualRows.
+        for (const sameValue of staleMap.values()) {
+            for (const vr of sameValue) {
+                const vri = vr.i.get();
+                const i = vri - freshTopIndex;
+                if (i > 0 && i < freshVirtualCount && freshVirtualRows[i] === undefined) {
+                    vr.s.set(data.get(vri));
+                    freshVirtualRows[i] = vr;
+                } else {
+                    staleArray.push(vr);
+                }
+            }
+        }
+
         // Fill in the rest of the rows.
-        const staleArray = [...staleMap.values()].flat(1);
         let madeNewVirtualRow = false;
         for (let i = 0; i < freshVirtualCount; i++) {
             if (freshVirtualRows[i] === undefined) {
@@ -123,6 +138,7 @@ export const ListView = uiComponent(function ListView<T>(
                     const vr = staleArray.pop() as VirtualRow<T>;
                     vr.i.set(vri);
                     vr.s.set(vrs);
+                    freshVirtualRows[i] = vr;
                 } else {
                     const vriState = new State(vri);
                     freshVirtualRows[i] = {
@@ -132,7 +148,6 @@ export const ListView = uiComponent(function ListView<T>(
                         style: { gridRow: vriState.map(indexToGridRow) },
                     };
                     madeNewVirtualRow = true;
-                    console.log('made new row');
                 }
             }
         }
@@ -165,3 +180,48 @@ export const ListView = uiComponent(function ListView<T>(
     return viewport;
 });
 
+type GridColumn<T> = {
+    renderCell: (s: State<T>, style: HTMLElementStyleAttributes) => (HTMLElement | OpaqueRenderedElement),    // TODO: forbid returning OpaqueRenderedElement so that we can't have components in there?
+    renderHeader: (style: HTMLElementStyleAttributes) => (HTMLElement | OpaqueRenderedElement),
+    gridTemplateColumn: string,
+};
+
+export function GridView<ColumnsT extends any[]>(
+    attributes: HTMLElementAttributes,
+    data: ListViewData<ColumnsT>,
+    rowHeight: number,
+    renderRange: number,
+    columns: {[K in keyof ColumnsT]: GridColumn<ColumnsT[K]>},
+): OpaqueRenderedElement {
+    const gridTemplateColumns = columns.map(c => c.gridTemplateColumn).join(' ');
+    const columnStyles: HTMLElementStyleAttributes[] = columns.map((_, i) => ({gridColumn: `${i + 1}`}));   // TODO: grid lines etc.
+    const columnData: {[K in keyof ColumnsT]: (d: ColumnsT) => ColumnsT[K]} = columns.map((_, i) => ((d: ColumnsT) => d[i])) as any;    // TODO: can we make this typecheck?
+
+    const renderRow = uiComponent(function renderRow(s: State<ColumnsT>, style: HTMLElementStyleAttributes): HTMLElement {
+        return div(
+            {
+                style: {
+                    display: 'grid',
+                    gridTemplateColumns,
+                    ...style,
+                },
+                
+            },
+            // NB: state.trigger will return the same State if the same f is passed, so renderCell will get the same args on a re-render.
+            ...columns.map((c, i) => c.renderCell(s.trigger(columnData[i]), columnStyles[i])),
+        );
+    });
+    const renderHeader = uiComponent(function renderHeader(style: HTMLElementStyleAttributes): HTMLElement {
+        return div(
+            {
+                style: {
+                    display: 'grid',
+                    gridTemplateColumns,
+                    ...style,
+                },
+            },
+            ...columns.map((c, i) => c.renderHeader(columnStyles[i])),
+        );
+    });
+    return ListView(attributes, data, rowHeight, renderRange, renderRow, renderHeader);
+}

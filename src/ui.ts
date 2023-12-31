@@ -36,16 +36,16 @@ class HasStateDep {
 };
 
 
-let inUIStateCall = false;
+let isStateMemoizedForRender = false;
 export function uiState<T>(key: string | number | Symbol, value: T): State<T> {
-    inUIStateCall = true;
+    isStateMemoizedForRender = true;
     try {
         if (contextStack.length === 0) {
             throw new Error('uiState called outside of render or bind function');
         }
         return contextStack[contextStack.length-1].makeState(key, value);
     } finally {
-        inUIStateCall = false;
+        isStateMemoizedForRender = false;
     }
 }
 
@@ -295,13 +295,14 @@ export class State<T> {
     private value: T;
     private gen: number;
     private deps: Set<HasStateDep>;
+    private triggers?: Map<(value: T) => any, State<any>>;
 
     constructor(value: T) {
         this.value = value;
         this.gen = 0;
         this.deps = new Set();
 
-        if (contextStack.length !== 0 && !inUIStateCall) {
+        if (contextStack.length !== 0 && !isStateMemoizedForRender) {
             throw new Error('use uiState call to create state inside render and bind functions');
         }
     }
@@ -341,11 +342,37 @@ export class State<T> {
             pendingWork = { timeoutID, states, promise, resolve, reject };
         }
         pendingWork.states.add(this);
+
+        if (this.triggers !== undefined) {
+            for (const [f, s] of this.triggers.entries()) {
+                s.set(f(value));
+            }
+        }
+
         return pendingWork.promise;
     }
 
+    // TODO: decide between trigger and map.
     map<MappedT>(f: (v: T) => MappedT): MappedState<[T], MappedT> {
         return new MappedState(f, this);
+    }
+
+    trigger<MappedT>(f: (v: T) => MappedT): State<MappedT> {
+        if (this.triggers === undefined) {
+            this.triggers = new Map();
+        }
+        let s = this.triggers.get(f);
+        if (s === undefined) {
+            const mappedValue = f(this.value);
+            try {
+                isStateMemoizedForRender = true;
+                s = new State<MappedT>(mappedValue);
+            } finally {
+                isStateMemoizedForRender = false;
+            }
+            this.triggers.set(f, s);
+        }
+        return s;
     }
 };
 
