@@ -1,6 +1,7 @@
 import { uiComponent, State, uiRoot } from "../ui.js";
 import { testBasicRender, testChildrenArgs, testSiblingRender } from "./render.js";
 import { li, ul } from "../dom.js";
+import { testAggregateWorkerEmpty, testAggregateWorkerSimple, testAggregateWorkerStack } from "./aggregateTree.js";
 
 type TestResult = {
     name: string;
@@ -46,6 +47,10 @@ async function runTests(container: HTMLElement) {
     await run(testBasicRender);
     await run(testSiblingRender);
     await run(testChildrenArgs);
+
+    await run(testAggregateWorkerEmpty);
+    await run(testAggregateWorkerSimple);
+    await run(testAggregateWorkerStack);
 }
 
 runTests(document.getElementById('results') as HTMLElement);

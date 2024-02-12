@@ -66,7 +66,20 @@ class Binding extends HasStateDep {
         this.detach();
         contextStack.push(this);
         try {
+            // TODO: why does detaching around mutation stop the scrolling?
+            // const parent = this.e.parentElement;
+            // const nextSibling = this.e.nextElementSibling;
+            // if (parent !== null) {
+            //     parent.removeChild(this.e);
+            // }
             this.callback(this.e);
+            // if (parent !== null) {
+            //     if (nextSibling !== null) {
+            //         nextSibling.insertAdjacentElement('beforebegin', this.e);
+            //     } else {
+            //         parent.appendChild(this.e);
+            //     }
+            // }
         } finally {
             if (this !== contextStack.pop()) {
                 throw new Error('unbalanced context stack push/pop');

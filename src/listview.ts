@@ -6,7 +6,9 @@ import { HTMLElementAttributes, HTMLElementStyleAttributes, div } from "./dom.js
 
 export interface ListViewData<T> {
     get: (i: number) => T;
+    // TODO: register and unregister listeners, this asyngenerator is akward.
     freshData: () => AsyncGenerator<number>;
+    // TODO: method to tell datasource what the scroll position is.
 };
 
 type VirtualRow<T> = {
@@ -114,19 +116,20 @@ export const ListView = uiComponent(function ListView<T>(
         //Find rows with the right indices.
         // NB: For some reason, this stops run-away scrolling. It's like the scroller wants to follow attached elements or something.
         // TODO: figure out why this is. Also, maybe experiment with detaching elements during mutation by binding to see if it helps.
-        const staleArray: VirtualRow<T>[] = []; // Array of completely stale VirtualRows, s and i don't match anything in freshVirtualRows.
-        for (const sameValue of staleMap.values()) {
-            for (const vr of sameValue) {
-                const vri = vr.i.get();
-                const i = vri - freshTopIndex;
-                if (i > 0 && i < freshVirtualCount && freshVirtualRows[i] === undefined) {
-                    vr.s.set(data.get(vri));
-                    freshVirtualRows[i] = vr;
-                } else {
-                    staleArray.push(vr);
-                }
-            }
-        }
+        // const staleArray: VirtualRow<T>[] = []; // Array of completely stale VirtualRows, s and i don't match anything in freshVirtualRows.
+        // for (const sameValue of staleMap.values()) {
+        //     for (const vr of sameValue) {
+        //         const vri = vr.i.get();
+        //         const i = vri - freshTopIndex;
+        //         if (i > 0 && i < freshVirtualCount && freshVirtualRows[i] === undefined) {
+        //             vr.s.set(data.get(vri));
+        //             freshVirtualRows[i] = vr;
+        //         } else {
+        //             staleArray.push(vr);
+        //         }
+        //     }
+        // }
+        const staleArray = [...staleMap.values()].flat(1);
 
         // Fill in the rest of the rows.
         let madeNewVirtualRow = false;
